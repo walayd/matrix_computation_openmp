@@ -97,10 +97,78 @@ int getElemFromMatrix(int i, int j, struct tablo * matrix){
         printf("j is higher than the number of the matrix columns\n");
         exit(1);
     }
+    else if(j < 1){
+        printf("j is less than 1, it's not possible to get\n");
+        exit(1);
+    }
+    else if(i < 1){
+        printf("i is less than 1, it's not possible to get\n");
+        exit(1);
+    }
     else{
         return (matrix->tab[matrix->nb_rows * (i-1) + (j-1)]);
     }
 }
+
+int setElemToMatrix(int i, int j, struct tablo * matrix, int value){
+    if(i > matrix->nb_rows){
+        printf("i is higher than the number of the matrix lines\n");
+        exit(1);
+    }
+    else if(j > matrix->nb_cols){
+        printf("j is higher than the number of the matrix columns\n");
+        exit(1);
+    }
+    else{
+        return (matrix->tab[matrix->nb_rows * (i-1) + (j-1)] = value);
+    }
+}
+
+
+struct tablo * getCol(int j, struct tablo * matrixSrc, struct tablo * result){
+    for(int i = 0; i < matrixSrc->nb_rows; i++) {
+        // i + 1 parce qu'on peut pas get un élément 0. ça commence par 1
+        result->tab[i] = getElemFromMatrix(i+1, j, matrixSrc);
+    }
+}
+
+struct tablo * getRow(int i, struct tablo * matrixSrc, struct tablo * result){
+    for(int j = 0; j < matrixSrc->nb_cols; j++) {
+        // i + 1 parce qu'on peut pas get un élément 0. ça commence par 1
+        result->tab[j] = getElemFromMatrix(i, j+1, matrixSrc);
+    }
+}
+
+int sumMultipyTwoVectors(struct tablo * matrixRow, struct tablo * matrixCol){
+    int res = 0;
+    for(int i = 0; i < matrixRow->size; i++){
+        res = res + matrixRow->tab[i] * matrixCol->tab[i];
+    }
+    return res;
+}
+
+// ligne fois column
+// 1ere ligne, 1ere column pour (1,1) (row, col)
+// 2eme ligne, 1ere column pour (2,1) (row, col)
+
+void multiplyMatrix(struct tablo * matrixA, struct tablo * matrixB, struct tablo * matrixResult){
+
+    struct tablo * matrixARow = allocateTablo(matrixA->nb_cols);
+    struct tablo * matrixBCol = allocateTablo(matrixB->nb_rows);
+    int value = 0;
+    for(int j = 0; j < matrixB->nb_cols; j++){
+        for(int i = 0; i < matrixA->nb_rows; i++){
+
+            getRow(i+1, matrixA, matrixARow);
+            getCol(j+1, matrixB, matrixBCol);
+
+            // ok
+            value = sumMultipyTwoVectors(matrixARow, matrixBCol);
+            setElemToMatrix(i+1,j+1, matrixResult, value);
+        }
+    }
+}
+
 
 int main(int argc, char* argv[]) {
 
@@ -122,18 +190,19 @@ int main(int argc, char* argv[]) {
 		gettingMatrixDataFromFile(argv[1], matrixA);
 		gettingMatrixDataFromFile(argv[2], matrixB);
 
-        printf("elem 1 1 : %d\n", getElemFromMatrix(3,3, matrixA));
-		// multiplyMatrix(matrixA, matrixB, matrixResult);
+        struct tablo * matrixACol = allocateTablo(sqrt(matrix_length));
+        struct tablo * matrixARow = allocateTablo(sqrt(matrix_length));
+
 
 		printArray(matrixA);
 		printArray(matrixB);
-		// printArray(matrixResult);	 			      	 			      
-	}	
 
-
+        multiplyMatrix(matrixA, matrixB, matrixResult);
+        printArray(matrixResult);
+	}
+	
 	// scatter pour A, scatter pour B
 	// matrice vecteur donc il faut un autre for
-
 
 	return EXIT_SUCCESS;
 	
