@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <omp.h>
 
 struct tablo {
   int * tab;
@@ -124,7 +125,6 @@ int setElemToMatrix(int i, int j, struct tablo * matrix, int value){
     }
 }
 
-
 struct tablo * getCol(int j, struct tablo * matrixSrc, struct tablo * result){
     for(int i = 0; i < matrixSrc->nb_rows; i++) {
         // i + 1 parce qu'on peut pas get un élément 0. ça commence par 1
@@ -169,9 +169,100 @@ void multiplyMatrix(struct tablo * matrixA, struct tablo * matrixB, struct tablo
     }
 }
 
+void multiply(struct tablo * matrixA, struct tablo * matrixB, struct tablo * matrixResult)
+{
+    int i, j, k;
+    for (i = 0; i < matrixA->nb_rows; i++)
+    {
+        for (j = 0; j < matrixB->nb_cols; j++)
+        {
+            setElemToMatrix(i+1, j+1, matrixResult, 0);
+            for (k = 0; k < matrixA->nb_rows; k++)
+                setElemToMatrix(i+1, j+1, matrixResult, getElemFromMatrix(i+1, j+1, matrixResult) + getElemFromMatrix(i+1, k+1, matrixA) * getElemFromMatrix(k+1,j+1, matrixB));
+        }
+    }
+}
+
+void multiply_omp(struct tablo * matrixA, struct tablo * matrixB, struct tablo * matrixResult)
+{
+    #pragma omp parallel
+    {
+        int i, j, k;
+        #pragma omp for
+        for (i = 0; i < matrixA->nb_rows; i++)
+        {
+            for (j = 0; j < matrixB->nb_cols; j++)
+            {
+                setElemToMatrix(i+1, j+1, matrixResult, 0);
+                for (k = 0; k < matrixA->nb_rows; k++)
+                    setElemToMatrix(i+1, j+1, matrixResult, getElemFromMatrix(i+1, j+1, matrixResult) + getElemFromMatrix(i+1, k+1, matrixA) * getElemFromMatrix(k+1,j+1, matrixB));
+            }
+        }
+    };
+
+}
+
+void getSubMatrix(struct tablo * matrix, struct tablo * submatrix, int startingrow, int endingrow, int startingcol, int endingcol){
+    printf("getting the submatrix of startrow : %d, endrow : %d, startcol : %d, endcol : %d \n", startingrow, endingrow, startingcol, endingcol);
+    if(endingrow < startingrow || endingrow > matrix->nb_rows){
+        printf("GetSubMatrix : error int the ending row input");
+        exit(1);
+    }
+    if(endingcol < startingcol || endingcol > matrix->nb_cols){
+        printf("GetSubMatrix : error in the ending col input");
+        exit(1);
+    }
+    if(startingrow < 1 || startingrow > matrix->nb_rows || startingrow > endingrow){
+        printf("GetSubMatrix : error in the starting row input");
+        exit(1);
+    }
+    if(startingcol < 1 || startingcol > matrix->nb_cols || startingcol > endingcol){
+        printf("GetSubMatrix : error in the starting col input");
+        exit(1);
+    }
+
+    int k = 0;
+    for(int i = startingrow; i <= endingrow; i++){
+        for(int j = startingcol; j<= endingcol; j++){
+            submatrix->tab[k] = getElemFromMatrix(i, j, matrix);
+            k++;
+        }
+    }
+}
+
+int getSizeSubMatrix(struct tablo * matrix, int totalProcess){
+    int nbrows = totalProcess / matrix->nb_rows;
+    if((totalProcess % matrix->nb_rows) != 0){
+        nbrows = nbrows + 1;
+    }
+    return nbrows * matrix->nb_cols;
+}
+
+
+void getRowsSubMatrix(struct tablo * matrix, struct tablo * submatrix, int nbOfProcess, int totalProcess){
+    int step = totalProcess / sqrt(submatrix->size);
+    int startingRow = step * nbOfProcess + 1;
+    int endingRow = startingRow + step - 1;
+    int startingCol = 1;
+    int endingCol = matrix->nb_cols;
+
+    getSubMatrix(matrix, submatrix, startingRow, endingRow, startingCol, endingCol);
+}
+
+void getColsSubMatrix(struct tablo * matrix, struct tablo * submatrix, int nbOfProcess, int totalProcess){
+    int step = totalProcess / sqrt(submatrix->size);
+    int startingRow = 1;
+    int endingRow = matrix->nb_rows;
+    int startingCol = step * nbOfProcess + 1;
+    int endingCol = startingCol + step - 1;
+
+    getSubMatrix(matrix, submatrix, startingRow, endingRow, startingCol, endingCol);
+}
+
 
 int main(int argc, char* argv[]) {
 
+    double dtime;
 	if (argc < 3) {
 		printf("Error, arguments missing\n");	
 		return EXIT_FAILURE;
@@ -193,14 +284,33 @@ int main(int argc, char* argv[]) {
         struct tablo * matrixACol = allocateTablo(sqrt(matrix_length));
         struct tablo * matrixARow = allocateTablo(sqrt(matrix_length));
 
+        struct tablo * subMatrix = allocateTablo(4);
 
 		printArray(matrixA);
 		printArray(matrixB);
 
-        multiplyMatrix(matrixA, matrixB, matrixResult);
-        printArray(matrixResult);
+        // testing multiply with openmp
+        dtime = omp_get_wtime();
+        multiply_omp(matrixA, matrixB, matrixResult);
+        dtime = omp_get_wtime() - dtime;
+        printf("%f\n", dtime);
+
+        // testing multiply without openmp
+        dtime = omp_get_wtime();
+        multiply(matrixA, matrixB, matrixResult);
+        dtime = omp_get_wtime() - dtime;
+        printf("%f\n", dtime);
+
+        // getSubMatrix(matrixA, subMatrix, 1, 2, 2, 3);
+        // printArray(subMatrix);
+        int sizesubmatrix = getSizeSubMatrix(matrixA, 3);
+        struct tablo * subMatrixA = allocateTablo(sizesubmatrix);
+        //getSubMatrix(matrixA, subMatrixA, 3, 3, 1, 3);
+
+        getColsSubMatrix(matrixA, subMatrixA, 2, 3);
+        printArray(subMatrixA);
 	}
-	
+
 	// scatter pour A, scatter pour B
 	// matrice vecteur donc il faut un autre for
 

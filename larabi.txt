@@ -1,0 +1,21 @@
+p0 commence à travailler
+    p0 a accès à la matrice A et la matrice B
+    Les autres n'ont pas accès aux matrices A et B
+
+    p0 doit lire les matrice sur le disque et distribuer
+
+    On suppose qu'on a 3 processeurs :
+
+    * 1ere étape de l'algo:
+        p0 distrbue A
+            comment il distribue?
+                il découpe A en autant de morceaux qu'il y a de processeurs
+                si A il a plusieurs lignes (9 lignes) chaque processeur aura une sous matrice de 3 lignes
+
+    * 2eme étape de l'algo:
+        p0 distribue B
+            comment il distribue?
+                il découpe B en autant de morceaux qu'il y a de processeurs
+                si B il a plusieurs colonnes (9 colonnes) chaque processeur aura une sous matrice de 3 colonnes
+
+    scatter grosse donnée  qu on veu distrib a plein de monde algo vu en cours
