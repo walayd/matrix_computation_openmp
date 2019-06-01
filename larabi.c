@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <math.h>
 
 struct tablo {
   int * tab;
@@ -12,6 +12,8 @@ struct tablo {
 struct tablo * allocateTablo(int size) {
   struct tablo * tmp = malloc(sizeof(struct tablo));
   tmp->size = size;
+  tmp->nb_cols = (int)sqrt(size);
+  tmp->nb_rows = (int)sqrt(size);
   tmp->tab = malloc(size*sizeof(int));
   return tmp;
 }
@@ -27,7 +29,6 @@ struct tablo * reallocateTabloTwice(struct tablo * tmp) {
   return tmp;
 }
 
-
 void printArray(struct tablo * tmp) {
   // printf("---- Array of size %i ---- \n", tmp->size);
   int size = tmp->size;
@@ -37,7 +38,6 @@ void printArray(struct tablo * tmp) {
   }
   printf("\n");
 }
-
 
 int calculateMatrixLength(char filename[]){
 	printf("Starting allocating matrix \n");
@@ -88,6 +88,20 @@ void gettingMatrixDataFromFile(char filename[], struct tablo * matrix){
 	}
 }
 
+int getElemFromMatrix(int i, int j, struct tablo * matrix){
+    if(i > matrix->nb_rows){
+        printf("i is higher than the number of the matrix lines\n");
+        exit(1);
+    }
+    else if(j > matrix->nb_cols){
+        printf("j is higher than the number of the matrix columns\n");
+        exit(1);
+    }
+    else{
+        return (matrix->tab[matrix->nb_rows * (i-1) + (j-1)]);
+    }
+}
+
 int main(int argc, char* argv[]) {
 
 	if (argc < 3) {
@@ -108,7 +122,7 @@ int main(int argc, char* argv[]) {
 		gettingMatrixDataFromFile(argv[1], matrixA);
 		gettingMatrixDataFromFile(argv[2], matrixB);
 
-
+        printf("elem 1 1 : %d\n", getElemFromMatrix(3,3, matrixA));
 		// multiplyMatrix(matrixA, matrixB, matrixResult);
 
 		printArray(matrixA);
