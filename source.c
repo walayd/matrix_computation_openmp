@@ -74,7 +74,7 @@ int calculateMatrixLength(char filename[]){
 	return len*len;
 }
 
-void settingDataForMatrixFromFile(char filename[], struct tablo * matrix){
+void gettingMatrixDataFromFile(char filename[], struct tablo * matrix){
 	FILE *fp;
 	fp = fopen(filename, "r");
 	int i=0;
@@ -96,13 +96,19 @@ int main(int argc, char* argv[]) {
 	} else {
 		printf("first arg : %s\nsecond arg : %s\n", argv[1], argv[2]);
 
+		// calculate matrix length to know how much size to allocate
 		int matrix_length = calculateMatrixLength(argv[1]);
+
+		// allocate space for matrix A, matrix B and the correct size for matrix result
 		struct tablo * matrixA = allocateTablo(matrix_length);
 		struct tablo * matrixB = allocateTablo(matrix_length);
 		struct tablo * matrixResult = allocateTablo(matrix_length);
 
-		settingDataForMatrixFromFile(argv[1], matrixA);
-		settingDataForMatrixFromFile(argv[2], matrixB);
+		// getting matrix data (of A and B) from file
+		gettingMatrixDataFromFile(argv[1], matrixA);
+		gettingMatrixDataFromFile(argv[2], matrixB);
+
+
 		// multiplyMatrix(matrixA, matrixB, matrixResult);
 
 		printArray(matrixA);
