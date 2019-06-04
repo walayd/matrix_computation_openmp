@@ -40,38 +40,82 @@ void printArray(struct tablo * tmp) {
   printf("\n");
 }
 
-int calculateMatrixLength(char filename[]){
-	printf("Starting allocating matrix \n");
-	int len = 0;
-	FILE *fp;
-	char c;
+int getNbColsWhenRead(char filename[]) {
+    printf("get nb cols when read ... \n");
+    int nbCols = 0;
+    FILE *fp;
+    char c;
 
-	fp = fopen(filename, "r");
+    fp = fopen(filename, "r");
 
-	if (fp == NULL) {
-		printf("Opening file error\n");
-		return -1;
-	}
+    if (fp == NULL) {
+        printf("Opening file error\n");
+        return -1;
+    }
 
-	// find length of first line
-	// lines end in "\n", but some malformed text files may not have this char at all
-	// and whole file contents will be considered as the first line
-	while((c = fgetc(fp)) != EOF) {
-		if (c == '\n') {
-			break;
-		}
-		if (c != ' ' && c != '-'){
-			len++;
-		}
-	}
- 
-	printf("Length of first line is: %d\n", len);
+    // find length of first line
+    // lines end in "\n", but some malformed text files may not have this char at all
+    // and whole file contents will be considered as the first line
+    while((c = fgetc(fp)) != EOF) {
+        if (c == '\n') {
+            break;
+        }
+        if ((c != ' ') && (c != '-')){
+            nbCols++;
+        }
+    }
 
-	// seek to beginning of file
-	fseek(fp, 0, SEEK_SET);
-	fclose(fp);
-	// allocate memory for size of first line (len)
-	return len*len;
+    printf("nb cols is: %d\n", nbCols);
+
+    // seek to beginning of file
+    fseek(fp, 0, SEEK_SET);
+    fclose(fp);
+    // allocate memory for size of first line (len)
+    return nbCols;
+}
+
+int getNbRowsWhenRead(char filename[]) {
+    printf("get nb rows when read ... \n");
+    int nbRows = 0;
+    FILE *fp;
+    char c;
+
+    fp = fopen(filename, "r");
+
+    if (fp == NULL) {
+        printf("Opening file error\n");
+        return -1;
+    }
+
+    // find length of first line
+    // lines end in "\n", but some malformed text files may not have this char at all
+    // and whole file contents will be considered as the first line
+    while((c = fgetc(fp)) != EOF) {
+        if (c == '\n') {
+            nbRows++;
+        }
+    }
+
+    printf("nb rows is: %d\n", nbRows);
+
+
+    // seek to beginning of file
+    fseek(fp, 0, SEEK_SET);
+    fclose(fp);
+    // allocate memory for size of first line (len)
+    return nbRows;
+}
+
+
+int calculateMatrixCarreLength(char filename[]){
+	int nbCols = getNbColsWhenRead(filename);
+    return nbCols * nbCols;
+}
+
+int calculateMatrixNotCarreLength(char filename[]) {
+    int nbRow = getNbRowsWhenRead(filename);
+    int nbCol = getNbColsWhenRead(filename);
+    return nbRow * nbCol;
 }
 
 void gettingMatrixDataFromFile(char filename[], struct tablo * matrix){
@@ -80,9 +124,13 @@ void gettingMatrixDataFromFile(char filename[], struct tablo * matrix){
 	int i=0;
 	char c;
 	int isNeg = 0; // false if 0
+	int nbRows = 0;
 	while((c = fgetc(fp)) != EOF) {
 	    if (c == '-'){
 	        isNeg = 1;
+	    }
+	    if(c == '\n'){
+	        nbRows = nbRows + 1;
 	    }
 		if (c != '\n' && c != ' ' && c != '-') {
 			matrix->tab[i] = (int)(c - '0');
@@ -94,6 +142,8 @@ void gettingMatrixDataFromFile(char filename[], struct tablo * matrix){
 			i++;
 		}
 	}
+	matrix->nb_rows = nbRows;
+	matrix->nb_cols = i/nbRows;
 }
 
 int getElemFromMatrix(int i, int j, struct tablo * matrix){
@@ -114,7 +164,7 @@ int getElemFromMatrix(int i, int j, struct tablo * matrix){
         exit(1);
     }
     else{
-        return (matrix->tab[matrix->nb_rows * (i-1) + (j-1)]);
+        return (matrix->tab[matrix->nb_cols * (i-1) + (j-1)]);
     }
 }
 
@@ -141,6 +191,7 @@ struct tablo * getCol(int j, struct tablo * matrixSrc, struct tablo * result){
         // i + 1 parce qu'on peut pas get un élément 0. ça commence par 1
         result->tab[i] = getElemFromMatrix(i+1, j, matrixSrc);
     }
+    return result;
 }
 
 struct tablo * getRow(int i, struct tablo * matrixSrc, struct tablo * result){
@@ -148,6 +199,7 @@ struct tablo * getRow(int i, struct tablo * matrixSrc, struct tablo * result){
         // i + 1 parce qu'on peut pas get un élément 0. ça commence par 1
         result->tab[j] = getElemFromMatrix(i, j+1, matrixSrc);
     }
+    return result;
 }
 
 int sumMultipyTwoVectors(struct tablo * matrixRow, struct tablo * matrixCol){
@@ -158,11 +210,7 @@ int sumMultipyTwoVectors(struct tablo * matrixRow, struct tablo * matrixCol){
     return res;
 }
 
-// ligne fois column
-// 1ere ligne, 1ere column pour (1,1) (row, col)
-// 2eme ligne, 1ere column pour (2,1) (row, col)
-
-
+// depreciated
 void multiply1(struct tablo * matrixA, struct tablo * matrixB, struct tablo * matrixResult)
 {
     if (matrixA->nb_cols != matrixB->nb_rows){
@@ -189,13 +237,17 @@ void multiply2(struct tablo * matrixA, struct tablo * matrixB, struct tablo * ma
         exit(1);
     }
     for(int iA = 1; iA < matrixA->nb_rows+1; iA++){
-        int sum = 0;
+
         for(int jB = 1; jB < matrixB->nb_cols+1; jB++){
-            for(int k = 1; k < matrixB->nb_rows+1; k++){
-                sum = sum + getElemFromMatrix(iA, k, matrixA) * getElemFromMatrix(k, jB, matrixB);
+
+            int sum = 0;
+
+            for(int iter = 1; iter < matrixA->nb_cols+1; iter++){
+                // printf("%d * %d\n",getElemFromMatrix(iA, iter, matrixA), getElemFromMatrix(iter, jB, matrixB));
+                sum = sum + getElemFromMatrix(iA, iter, matrixA), getElemFromMatrix(iter, jB, matrixB);
             }
             setElemToMatrix(iA, jB, matrixResult, sum);
-            sum=0;
+
         }
     }
 }
@@ -217,7 +269,6 @@ void multiply3(struct tablo * matrixA, struct tablo * matrixB, struct tablo * ma
         }
     }
 }
-
 
 void multiply_omp(struct tablo * matrixA, struct tablo * matrixB, struct tablo * matrixResult)
 {
@@ -302,7 +353,6 @@ void getColsSubMatrix(struct tablo * matrix, struct tablo * submatrix, int nbOfP
     getSubMatrix(matrix, submatrix, startingRow, endingRow, startingCol, endingCol);
 }
 
-
 int main(int argc, char* argv[]) {
 
     double dtime;
@@ -313,28 +363,32 @@ int main(int argc, char* argv[]) {
 		printf("first arg : %s\nsecond arg : %s\n", argv[1], argv[2]);
 
 		// calculate matrix length to know how much size to allocate
-		int matrix_length = calculateMatrixLength(argv[1]);
+		int matrix_length1 = calculateMatrixNotCarreLength(argv[1]);
+        int matrix_length2 = calculateMatrixNotCarreLength(argv[2]);
 
-		// allocate space for matrix A, matrix B and the correct size for matrix result
-		struct tablo * matrixA = allocateTablo(matrix_length);
-		struct tablo * matrixB = allocateTablo(matrix_length);
-		printf("size to allocate for result matrix %d\n", getMatrixSizeToAllocate(matrixA, matrixB));
-		struct tablo * matrixResult = allocateTablo(getMatrixSizeToAllocate(matrixA, matrixB));
+
+        // allocate space for matrix A, matrix B and the correct size for matrix result
+		struct tablo * matrixA = allocateTablo(matrix_length1);
+		struct tablo * matrixB = allocateTablo(matrix_length2);
 
 		// getting matrix data (of A and B) from file
 		gettingMatrixDataFromFile(argv[1], matrixA);
 		gettingMatrixDataFromFile(argv[2], matrixB);
 
-		printArray(matrixA);
-		printArray(matrixB);
+        printf("size to allocate for result matrix %d\n", getMatrixSizeToAllocate(matrixA, matrixB));
+        struct tablo * matrixResult = allocateTablo(getMatrixSizeToAllocate(matrixA, matrixB));
+        printf("Matrix result size: %d\n", matrixResult->size);
 
-		/*
-        printf("testing multiply 1 without openmp\n");
-        dtime = omp_get_wtime();
-        multiply1(matrixA, matrixB, matrixResult);
-        dtime = omp_get_wtime() - dtime;
-        printf("%f\n", dtime);
-        printArray(matrixResult);
+        printf("for matrix A, it has %d rows and %d cols \n", matrixA->nb_rows, matrixA->nb_cols);
+        printArray(matrixA);
+
+        printf("for matrix B, it has %d rows and %d cols \n", matrixB->nb_rows, matrixB->nb_cols);
+        printArray(matrixB);
+
+        printf("for matrix B, elem (2, 1) is %d \n", getElemFromMatrix(2,1,matrixB));
+
+
+
 
         // multiply 2 seems to be the best one.
         printf("testing multiply 2 without openmp\n");
@@ -351,16 +405,11 @@ int main(int argc, char* argv[]) {
         printf("%f\n", dtime);
         printArray(matrixResult);
 
-        printf("testing multiply with openmp\n");
-        dtime = omp_get_wtime();
-        multiply_omp(matrixA, matrixB, matrixResult);
-        dtime = omp_get_wtime() - dtime;
-        printf("%f\n", dtime);
-        printArray(matrixResult);
-        */
+
+        // done : repair matrix length when reading : ok
+        // done : correcting the multiply function for unbalanced matrix
 
 
-		
         /*// testing submatrix (of 4 elements)
         struct tablo * subMatrix = allocateTablo(4);
         getSubMatrix(matrixA, subMatrix, 1, 2, 2, 3);
