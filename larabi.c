@@ -420,6 +420,22 @@ void fillMatrix(struct tablo *bigMatrix, struct tablo *littleMatrix, int offset)
     }
 }
 
+void fillFinalMatrix(struct tablo *finalMatrix, struct tablo *bigMatrix, int offset) {
+    if (finalMatrix->nb_cols != bigMatrix->nb_cols) {
+        printf("the two matrix do not have the same cols number \n");
+        exit(1);
+    } else {
+        for (int i = 1; i <= bigMatrix->nb_rows; i++) {
+            for (int j = 1; j <= bigMatrix->nb_cols; j++) {
+                int value = getElemFromMatrix(i, j, bigMatrix);
+                //printf("littlematrix(%d, %d) value : %d\n",i, j, value);
+                // printf("bigmatrix(%d, %d) value : %d\n", i, j + offset, value);
+                setElemToMatrix(i+offset, j, finalMatrix, value);
+            }
+        }
+    }
+}
+
 void prettyPrintMatrix(struct tablo *Matrix) {
     printf("------------------- \n");
     for (int i = 1; i <= Matrix->nb_rows; i++) {
@@ -481,6 +497,13 @@ int main(int argc, char *argv[]) {
         struct tablo *bigMatrix = allocateTablo(dim * dim / numprocs);
         bigMatrix->nb_rows = dim / numprocs;
         bigMatrix->nb_cols = dim;
+
+
+        struct tablo *finalMatrix = allocateTablo(dim * dim);
+        finalMatrix->nb_rows = dim;
+        finalMatrix->nb_cols = dim;
+
+
         int step = 0;
 
         if (rank == 0) {  // P0
@@ -629,11 +652,11 @@ int main(int argc, char *argv[]) {
                 // prettyPrintMatrix(my_product);
 
 
-                printf("------------------------------------- \n ");
+                // printf("------------------------------------- \n ");
                 fillMatrix(bigMatrix, my_product, ((rank+step)%numprocs * dim/numprocs) % dim);
                 step++;
                 // prettyPrintMatrix(bigMatrix);
-                printf("------------------------------------- \n ");
+                // printf("------------------------------------- \n ");
 
 
                 // printf("///////////////////////////////////////////////\n");
@@ -645,8 +668,26 @@ int main(int argc, char *argv[]) {
                 rotateMatrixToTheRight(matrixB, numprocs - 1);
             }
 
+            fillFinalMatrix(finalMatrix, bigMatrix, rank * (dim / numprocs));
 
-            prettyPrintMatrix(bigMatrix);
+            // prettyPrintMatrix(bigMatrix);
+
+            //  : recieve bigmatrix
+            for ( int i = 1 ; i < numprocs ; i++ ) {
+                // printf("nb of process : %d \n", numprocs);
+                // printf("size submatrix divided by rows : %d \n", getSizeSubmatrixDividedByRows(matrixA, numprocs));
+                struct tablo *recievedMatrix = allocateTablo(dim/numprocs * dim);
+                recievedMatrix->tab = recieve_slice(i, recievedMatrix->size);
+                recievedMatrix->nb_rows = dim / numprocs;
+                recievedMatrix->nb_cols = dim;
+                printf("recieved slice...");
+                printArray(recievedMatrix);
+                printf("---------");
+                fillFinalMatrix(finalMatrix, recievedMatrix, i * dim/numprocs);
+                prettyPrintMatrix(finalMatrix);
+            }
+
+            prettyPrintMatrix(finalMatrix);
 
         } else {  // others
             MPI_Probe(0, 0, MPI_COMM_WORLD, &status);
@@ -701,7 +742,10 @@ int main(int argc, char *argv[]) {
                 // rotateMatrixToTheRight(matrixB, 1);
             }
 
-            prettyPrintMatrix(bigMatrix);
+            // prettyPrintMatrix(bigMatrix);
+            printf("slice to send....");
+            printArray(bigMatrix);
+            send_slice(bigMatrix->tab, bigMatrix->size, 0);
 
         }
 
