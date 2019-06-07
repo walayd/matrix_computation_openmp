@@ -434,6 +434,29 @@ void prettyPrintMatrix(struct tablo *Matrix) {
     printf("------------------- \n");
 }
 
+void rotateMatrixToTheRight(struct tablo *matrix, int k){
+    // temporary array of size M
+    int temp[matrix->nb_cols];
+
+    // within the size of matrix
+    k = k % matrix->nb_cols;
+
+    for (int i = 0; i < matrix->nb_rows; i++) {
+
+        // copy first M-k elements to temporary array
+        for (int t = 0; t < matrix->nb_cols - k; t++)
+            temp[t] = getElemFromMatrix(i+1, t+1, matrix);
+
+        // copy the elements from k to end to starting
+        for (int j = matrix->nb_cols - k; j < matrix->nb_cols; j++)
+            setElemToMatrix(i+1, j - matrix->nb_cols + k +1, matrix, getElemFromMatrix(i+1,j+1,matrix));
+
+        // copy elements from temporary array to end
+        for (int j = k; j < matrix->nb_cols; j++)
+            setElemToMatrix(i+1, j+1, matrix, temp[j - k]);
+    }
+}
+
 int main(int argc, char *argv[]) {
 
     int dim = getNbColsWhenRead(argv[1]);
@@ -461,11 +484,11 @@ int main(int argc, char *argv[]) {
         int step = 0;
 
         if (rank == 0) {  // P0
-            printf("\n");
-            prettyPrintMatrix(littleMatrix);
-            printf("\n");
-            prettyPrintMatrix(bigMatrix);
-            printf("\n");
+            // printf("\n");
+            // prettyPrintMatrix(littleMatrix);
+            // printf("\n");
+            // prettyPrintMatrix(bigMatrix);
+            // printf("\n");
 
 
             // printf("first arg : %s\nsecond arg : %s\n", argv[1], argv[2]);
@@ -482,6 +505,8 @@ int main(int argc, char *argv[]) {
             gettingMatrixDataFromFile(argv[1], matrixA);
             gettingMatrixDataFromFile(argv[2], matrixB);
 
+            // prettyPrintMatrix(matrixA);
+            // rotateMatrixToTheRight(matrixA, 1);
             // prettyPrintMatrix(matrixA);
             // prettyPrintMatrix(matrixB);
 
@@ -614,6 +639,8 @@ int main(int argc, char *argv[]) {
             // prettyPrintMatrix(my_rows);
             // prettyPrintMatrix(my_cols)
             // printf("///////////////////////////////////////////////\n");
+
+
 
         } else {  // others
             MPI_Probe(0, 0, MPI_COMM_WORLD, &status);
