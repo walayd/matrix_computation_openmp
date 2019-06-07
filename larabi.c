@@ -600,47 +600,53 @@ int main(int argc, char *argv[]) {
             // printf("i'm the proc : %d, and here's my row slice: \n", rank);
             // prettyPrintMatrix(my_rows);
 
-            // step 2 : Send columns
-            for ( int i = 0 ; i < numprocs ; i ++ ) {
-                // printf("nb of process : %d \n", numprocs);
-                // printf("size submatrix divided by rows : %d \n", getSizeSubmatrixDividedByRows(matrixA, numprocs));
-                struct tablo *SubMatrixAByCols = allocateTablo(getSizeSubmatrixDividedByCols(matrixB, numprocs));
-                getSubmatrixDividedByCols(matrixB, SubMatrixAByCols, i, numprocs);
-                // printf("for proc : %d, here's the column slice: \n",i);
-                // prettyPrintMatrix(SubMatrixAByCols);
-                send_slice(SubMatrixAByCols->tab, SubMatrixAByCols->size, i);
+            for(int rotation = 0; rotation < numprocs; rotation++){
+
+                // step 2 : Send columns
+                for ( int i = 0 ; i < numprocs ; i ++ ) {
+                    // printf("nb of process : %d \n", numprocs);
+                    // printf("size submatrix divided by rows : %d \n", getSizeSubmatrixDividedByRows(matrixA, numprocs));
+                    struct tablo *SubMatrixAByCols = allocateTablo(getSizeSubmatrixDividedByCols(matrixB, numprocs));
+                    getSubmatrixDividedByCols(matrixB, SubMatrixAByCols, i, numprocs);
+                    // printf("for proc : %d, here's the column slice: \n",i);
+                    // prettyPrintMatrix(SubMatrixAByCols);
+                    send_slice(SubMatrixAByCols->tab, SubMatrixAByCols->size, i);
+                }
+
+                // Receive B columns
+                struct tablo * my_cols = allocateTablo(getSizeSubmatrixDividedByRows(matrixB, numprocs));
+                getSubmatrixDividedByCols(matrixB, my_cols, 0, numprocs);
+                my_cols->nb_rows = dim;
+                my_cols->nb_cols = dim / numprocs;
+                // printf("i'm the proc : %d, and here's my col slice: \n", rank);
+                // prettyPrintMatrix(my_rows);
+
+                // Processing multiplication.
+                struct tablo * my_product = allocateTablo(getMatrixSizeToAllocate(my_rows, my_cols));
+                //printf("the size of the product : %d ", my_product->size);
+                multiply3(my_rows,my_cols,my_product);
+                //printf("my product: \n");
+                // prettyPrintMatrix(my_product);
+
+
+                printf("------------------------------------- \n ");
+                fillMatrix(bigMatrix, my_product, ((rank+step)%numprocs * dim/numprocs) % dim);
+                step++;
+                // prettyPrintMatrix(bigMatrix);
+                printf("------------------------------------- \n ");
+
+
+                // printf("///////////////////////////////////////////////\n");
+                // printf("proc rank : %d\n", rank);
+                // prettyPrintMatrix(my_rows);
+                // prettyPrintMatrix(my_cols)
+                // printf("///////////////////////////////////////////////\n");
+
+                rotateMatrixToTheRight(matrixB, numprocs - 1);
             }
 
-            // Receive A rows
-            struct tablo * my_cols = allocateTablo(getSizeSubmatrixDividedByRows(matrixB, numprocs));
-            getSubmatrixDividedByCols(matrixB, my_cols, 0, numprocs);
-            my_cols->nb_rows = dim;
-            my_cols->nb_cols = dim / numprocs;
-            // printf("i'm the proc : %d, and here's my col slice: \n", rank);
-            // prettyPrintMatrix(my_rows);
 
-            // Processing multiplication.
-            struct tablo * my_product = allocateTablo(getMatrixSizeToAllocate(my_rows, my_cols));
-            //printf("the size of the product : %d ", my_product->size);
-            multiply3(my_rows,my_cols,my_product);
-            //printf("my product: \n");
-            // prettyPrintMatrix(my_product);
-
-
-            printf("------------------------------------- \n ");
-            fillMatrix(bigMatrix, my_product, ((rank+step)%numprocs * dim/numprocs) % dim);
-            step++;
             prettyPrintMatrix(bigMatrix);
-            printf("------------------------------------- \n ");
-
-
-            // printf("///////////////////////////////////////////////\n");
-            // printf("proc rank : %d\n", rank);
-            // prettyPrintMatrix(my_rows);
-            // prettyPrintMatrix(my_cols)
-            // printf("///////////////////////////////////////////////\n");
-
-
 
         } else {  // others
             MPI_Probe(0, 0, MPI_COMM_WORLD, &status);
@@ -656,32 +662,46 @@ int main(int argc, char *argv[]) {
             // printf("i'm the proc : %d, and here's my row slice: \n", rank);
             // prettyPrintMatrix(my_rows);
 
-            // Receive B columns
-            struct tablo * my_cols = allocateTablo(predicted_size);
-            my_cols->tab = recieve_slice(0, my_cols->size);
-            my_cols->nb_rows = dim;
-            my_cols->nb_cols = dim / numprocs;
-            // printf("i'm the proc : %d, and here's my col slice: \n", rank);
-            // prettyPrintMatrix(my_cols);
+            for(int rotation = 0; rotation < numprocs; rotation++) {
+
+                // Receive B columns
+                struct tablo *my_cols = allocateTablo(predicted_size);
+                my_cols->tab = recieve_slice(0, my_cols->size);
+                my_cols->nb_rows = dim;
+                my_cols->nb_cols = dim / numprocs;
+                // printf("i'm the proc : %d, and here's my col slice: \n", rank);
+                // prettyPrintMatrix(my_cols);
 
 
-            // Processing multiplication.
-            struct tablo * my_product = allocateTablo(getMatrixSizeToAllocate(my_rows, my_cols));
-            // printf("the size of the product : %d ", my_product->size);
-            multiply3(my_rows,my_cols,my_product);
-            // prettyPrintMatrix(my_product);
-            // printf("///////////////////////////////////////////////\n");
-            // printf("proc rank : %d\n", rank);
-            // printf("my rows : \n");
-            // prettyPrintMatrix(my_rows);
-            // printf("my columns : \n");
-            // prettyPrintMatrix(my_cols);
-            // printf("///////////////////////////////////////////////\n");
-            printf("------------------------------------- \n ");
-            fillMatrix(bigMatrix, my_product, ((rank+step)%numprocs * dim/numprocs) % dim);
-            step++;
+                // Processing multiplication.
+                struct tablo *my_product = allocateTablo(getMatrixSizeToAllocate(my_rows, my_cols));
+                // printf("the size of the product : %d ", my_product->size);
+                multiply3(my_rows, my_cols, my_product);
+                // prettyPrintMatrix(my_product);
+                // printf("///////////////////////////////////////////////\n");
+                // printf("proc rank : %d\n", rank);
+                // printf("my rows : \n");
+                // prettyPrintMatrix(my_rows);
+                // printf("my columns : \n");
+                // prettyPrintMatrix(my_cols);
+                // printf("///////////////////////////////////////////////\n");
+                // printf("------------------------------------- \n ");
+                fillMatrix(bigMatrix, my_product, ((rank+step)%numprocs * dim/numprocs) % dim);
+                step++;
+                // prettyPrintMatrix(bigMatrix);
+                // printf("------------------------------------- \n ");
+
+
+                // printf("///////////////////////////////////////////////\n");
+                // printf("proc rank : %d\n", rank);
+                // prettyPrintMatrix(my_rows);
+                // prettyPrintMatrix(my_cols)
+                // printf("///////////////////////////////////////////////\n");
+
+                // rotateMatrixToTheRight(matrixB, 1);
+            }
+
             prettyPrintMatrix(bigMatrix);
-            printf("------------------------------------- \n ");
 
         }
 
