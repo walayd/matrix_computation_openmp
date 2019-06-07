@@ -1,21 +1,108 @@
 p0 commence à travailler
-    p0 a accès à la matrice A et la matrice B
+    seulement p0 a accès à la matrice A et la matrice B
     Les autres n'ont pas accès aux matrices A et B
-
-    p0 doit lire les matrice sur le disque et distribuer
 
     On suppose qu'on a 3 processeurs :
 
     * 1ere étape de l'algo:
+        p0 lis A
         p0 distrbue A
             comment il distribue?
-                il découpe A en autant de morceaux qu'il y a de processeurs
-                si A il a plusieurs lignes (9 lignes) chaque processeur aura une sous matrice de 3 lignes
+                division : il découpe A en autant de morceaux qu'il y a de processeurs
+                si A il a plusieurs lignes (9 lignes) chaque processeur aura une sous matrice de 3 lignes (A0 pour P0 , A1 pour P1, A2 pour P2..)
+
+     // todo créer une fonction qui calcule la taille de la sous matrice qu'on cherche.
+               int getSizeSubmatrixDividedByRows(matrix, nbProcess, nbTotalProcess);
+               int getSizeSubmatrixDividedByCols(matrix, nbProcess, nbTotalProcess);
+
+     // todo créer une fonction qui en fonction du nombre du processeur rend une sous matrice.
+               matrix* getSubmatrixDividedByRows(matrix, nbProcess, nbTotalProcess);
+               matrix* getSubmatrixDividedByCols(matrix, nbProcess, nbTotalProcess, offset);
 
     * 2eme étape de l'algo:
+        p0 lis B
         p0 distribue B
             comment il distribue?
-                il découpe B en autant de morceaux qu'il y a de processeurs
-                si B il a plusieurs colonnes (9 colonnes) chaque processeur aura une sous matrice de 3 colonnes
+                division : il découpe B en autant de morceaux qu'il y a de processeurs
+                si B il a plusieurs colonnes (9 colonnes) chaque processeur aura une sous matrice de 3 colonnes (B0 pour P0 , B1 pour P1, B2 pour P2..)
 
-    scatter grosse donnée  qu on veu distrib a plein de monde algo vu en cours
+    info : l'opération de distrubution c'est ce qu'on appele des scatters.
+    Scatter grosse donnée  qu on veut distriber a plein de monde en petit morceau (algo vu en cours)
+
+    On calcule le produit matriciel
+
+    P0 : A0 * B0
+    P1 : A1 * B1
+    P2 : A2 * B2
+
+    à la fin de ces premières étapes, on aura calculé la diagonale.
+
+    le résultat est incomplet
+
+    mais mine de rien, un résultat est sur la machine p0, un résultat est sur la machine p1, un résultat est sur la machine p2..
+
+    l'étape d'après, on fait circuler B. (algo orienté, on doit définir le bon sens, à droite?..)
+
+    B0, B1, B2 --> B2, B0, B1
+
+    On calcule le produit matriciel
+
+    P0 : A0 * B2
+    P1 : A1 * B0
+    P2 : A2 * B1
+
+    Une dernière fois, on fait circuler B
+
+    et on calcule les bons morceaux
+
+    P0 : A0 * B1
+    P1 : A1 * B2
+    P2 : A2 * B0
+
+    à la fin de ces étapes de calculs (calcul local + circulation : étape longue et compliquée.)
+
+    Chaque processeur à une ligne complète (ou bloc de ligne complète) qui est le résultat partiel de la matrice finale
+
+    Que ce qu'il faut? ramener tout le monde à p0 (gather)
+
+    p0 affiche le résultat avec le bon format. Et c'est fini et on a gagné.
+
+
+    conseils :
+    que des calculs matriciels (parfait carré sur les produits matriciels.)
+    étape 0:
+    étape 1: écrire des fonctions pour calculer des produits matriciels pour n'importe quelle matrice (fondamentale)
+
+
+    choix : un tableau d'une dimension pour représenter la matrice :
+        avantages :
+            - cache prefetch du processeur... parcours va vite
+        problem :
+            - trouver bloc memoire continue (compliqué pour des giga..)
+            - faire des calculs d'offsets (solution: implementer method get et set..)
+
+    on est pas notés sur la performances
+
+    la taille de matrices multiple de processeurs
+    n = 500 et p = 3 (non divisible.)
+    ça va compliquer la vie œ
+
+    mpi prob.. si je lis maintenant, combien de truc à lire?
+
+en terme de code, il s'attend à des methods. (pas de main de 500 lignes)
+   lire A, scatter..
+   il veut comprendre le code
+   nomenclature (pas scatter pour broadcast)
+
+
+   conseil
+    - calcul local openmp (for) : note parallelisme voir consignes)
+
+
+
+
+
+
+
+
+

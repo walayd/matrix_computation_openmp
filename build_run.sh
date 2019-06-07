@@ -4,7 +4,8 @@
 mpicc -Wall -lm -fopenmp -o out  larabi.c
 
 # run with some dummy data
-mpirun  ./out  ./dummy/data ./dummy/data2 --oversubscribe
+# mpirun --oversubscribe -np 1 ./out  ./dummy/data ./dummy/data2
+mpirun --oversubscribe ./out  ./dummy/data ./dummy/data2
 
 # clear solution
 rm ./out

@@ -41,7 +41,6 @@ void printArray(struct tablo * tmp) {
 }
 
 int getNbColsWhenRead(char filename[]) {
-    printf("get nb cols when read ... \n");
     int nbCols = 0;
     FILE *fp;
     char c;
@@ -105,7 +104,6 @@ int getNbRowsWhenRead(char filename[]) {
     // allocate memory for size of first line (len)
     return nbRows;
 }
-
 
 int calculateMatrixCarreLength(char filename[]){
 	int nbCols = getNbColsWhenRead(filename);
@@ -272,10 +270,8 @@ void multiply3(struct tablo * matrixA, struct tablo * matrixB, struct tablo * ma
 
 void multiply_omp(struct tablo * matrixA, struct tablo * matrixB, struct tablo * matrixResult)
 {
-    #pragma omp parallel
     {
         int i, j, k;
-        #pragma omp for
         for (i = 0; i < matrixA->nb_rows; i++)
         {
             for (j = 0; j < matrixB->nb_cols; j++)
@@ -353,6 +349,40 @@ void getColsSubMatrix(struct tablo * matrix, struct tablo * submatrix, int nbOfP
     getSubMatrix(matrix, submatrix, startingRow, endingRow, startingCol, endingCol);
 }
 
+int getSizeSubmatrixDividedByRows(struct tablo * matrix, int nbTotalProcess){
+    int nbRowsByProcess = matrix->nb_rows / nbTotalProcess;
+    printf("nb rows by process : %d \n", nbRowsByProcess);
+    return nbRowsByProcess * matrix->nb_cols;
+}
+
+int getSizeSubmatrixDividedByCols(struct tablo * matrix, int nbTotalProcess){
+    int nbColsByProcess = matrix->nb_cols / nbTotalProcess;
+    printf("nb cols by process : %d \n", nbColsByProcess);
+    return nbColsByProcess * matrix->nb_rows;
+}
+
+void getSubmatrixDividedByRows(struct tablo * matrix, struct tablo * subMatrix, int numberOfProcess, int nbTotalProcess){
+    printf("[getSubmatrixDividedByRows]\n");
+    int nbRowsBySlice = matrix->nb_rows / nbTotalProcess;
+    int startingrow = nbRowsBySlice * numberOfProcess + 1 ;
+    int endingrow = nbRowsBySlice * (numberOfProcess + 1);
+    int startingcol = 1;
+    int endingcol = matrix->nb_cols;
+    printf("nbRowsBySlice %d, startingrow %d, endingrow %d, startingcol %d, endingcol %d \n", nbRowsBySlice, startingrow, endingrow, startingcol, endingcol);
+    getSubMatrix(matrix, subMatrix, startingrow, endingrow, startingcol, endingcol);
+}
+
+struct tablo * getSubmatrixDividedByCols(struct tablo * matrix, struct tablo * subMatrix, int numberOfProcess, int nbTotalProcess){
+    printf("[getSubmatrixDividedByRows]\n");
+    int nbColsBySlice = matrix->nb_rows / nbTotalProcess;
+    int startingrow = 1;
+    int endingrow = matrix->nb_rows;
+    int startingcol = nbColsBySlice * numberOfProcess + 1 ;
+    int endingcol = nbColsBySlice * (numberOfProcess + 1);
+    getSubMatrix(matrix, subMatrix, startingrow, endingrow, startingcol, endingcol);
+    return subMatrix;
+}
+
 int main(int argc, char* argv[]) {
 
     double dtime;
@@ -385,11 +415,22 @@ int main(int argc, char* argv[]) {
         printf("for matrix B, it has %d rows and %d cols \n", matrixB->nb_rows, matrixB->nb_cols);
         printArray(matrixB);
 
-        printf("for matrix B, elem (2, 1) is %d \n", getElemFromMatrix(2,1,matrixB));
+        //printf("for matrix B, elem (2, 1) is %d \n", getElemFromMatrix(2,1,matrixB));
 
+        printf("size submatrix divided by rows : %d \n", getSizeSubmatrixDividedByRows(matrixA, 3));
+        printf("size submatrix divided by cols : %d \n", getSizeSubmatrixDividedByCols(matrixB, 3));
 
+        struct tablo * SubMatrixAByRows = allocateTablo(getSizeSubmatrixDividedByRows(matrixA, 3));
+        struct tablo * SubMatrixAByCols = allocateTablo(getSizeSubmatrixDividedByCols(matrixA, 3));
 
+        getSubmatrixDividedByRows(matrixA, SubMatrixAByRows, 0, 3);
+        getSubmatrixDividedByCols(matrixA, SubMatrixAByCols, 0, 3);
 
+        printArray(SubMatrixAByRows);
+        printArray(SubMatrixAByCols);
+
+        
+        /*
         // multiply 2 seems to be the best one.
         printf("testing multiply 2 without openmp\n");
         dtime = omp_get_wtime();
@@ -410,7 +451,7 @@ int main(int argc, char* argv[]) {
         // done : correcting the multiply function for unbalanced matrix
 
 
-        /*// testing submatrix (of 4 elements)
+        // testing submatrix (of 4 elements)
         struct tablo * subMatrix = allocateTablo(4);
         getSubMatrix(matrixA, subMatrix, 1, 2, 2, 3);
         printArray(subMatrix);
