@@ -100,7 +100,6 @@ int getNbRowsWhenRead(char filename[]) {
 
     printf("nb rows is: %d\n", nbRows);
 
-
     // seek to beginning of file
     fseek(fp, 0, SEEK_SET);
     fclose(fp);
@@ -292,8 +291,8 @@ void multiply_omp(struct tablo *matrixA, struct tablo *matrixB, struct tablo *ma
 
 void getSubMatrix(struct tablo *matrix, struct tablo *submatrix, int startingrow, int endingrow, int startingcol,
                   int endingcol) {
-    printf("getting the submatrix of startrow : %d, endrow : %d, startcol : %d, endcol : %d \n", startingrow, endingrow,
-           startingcol, endingcol);
+    // printf("getting the submatrix of startrow : %d, endrow : %d, startcol : %d, endcol : %d \n", startingrow, endingrow,
+           // startingcol, endingcol);
     if (endingrow < startingrow || endingrow > matrix->nb_rows) {
         printf("GetSubMatrix : error int the ending row input");
         exit(1);
@@ -357,14 +356,15 @@ void getColsSubMatrix(struct tablo *matrix, struct tablo *submatrix, int nbOfPro
 }
 
 int getSizeSubmatrixDividedByRows(struct tablo *matrix, int nbTotalProcess) {
+    // printf("matrix->nb_rows : %d, nbTotalProcess : %d", matrix->nb_rows, nbTotalProcess);
     int nbRowsByProcess = matrix->nb_rows / nbTotalProcess;
-    printf("nb rows by process : %d \n", nbRowsByProcess);
+    // printf("nb rows by process : %d \n", nbRowsByProcess);
     return nbRowsByProcess * matrix->nb_cols;
 }
 
 int getSizeSubmatrixDividedByCols(struct tablo *matrix, int nbTotalProcess) {
     int nbColsByProcess = matrix->nb_cols / nbTotalProcess;
-    printf("nb cols by process : %d \n", nbColsByProcess);
+    //printf("nb cols by process : %d \n", nbColsByProcess);
     return nbColsByProcess * matrix->nb_rows;
 }
 
@@ -380,7 +380,8 @@ void getSubmatrixDividedByRows(struct tablo *matrix, struct tablo *subMatrix, in
 }
 
 struct tablo * getSubmatrixDividedByCols(struct tablo *matrix, struct tablo *subMatrix, int numberOfProcess, int nbTotalProcess) {
-    printf("[getSubmatrixDividedByRows]\n");
+    // printf("[getSubmatrixDividedByRows]\n");
+    // printf("matrix nb of rows : %d, col : %d..\n", matrix->nb_rows, subMatrix->nb_cols);
     int nbColsBySlice = matrix->nb_rows / nbTotalProcess;
     int startingrow = 1;
     int endingrow = matrix->nb_rows;
@@ -388,6 +389,19 @@ struct tablo * getSubmatrixDividedByCols(struct tablo *matrix, struct tablo *sub
     int endingcol = nbColsBySlice * (numberOfProcess + 1);
     getSubMatrix(matrix, subMatrix, startingrow, endingrow, startingcol, endingcol);
     return subMatrix;
+}
+
+void send_slice(int * slice_to_send, int its_size, int i) {
+    MPI_Send(slice_to_send, its_size, MPI_INT, i, 0, MPI_COMM_WORLD);
+}
+
+int * recieve_slice(int sender_rank, int size_to_receive) {
+
+    int * tablo = malloc(sizeof(int)*size_to_receive);
+
+    MPI_Recv(tablo, size_to_receive, MPI_INT, sender_rank, 0, MPI_COMM_WORLD, 0);
+
+    return tablo;
 }
 
 void fillMatrix(struct tablo *bigMatrix, struct tablo *littleMatrix, int offset) {
@@ -422,7 +436,10 @@ void prettyPrintMatrix(struct tablo *Matrix) {
 }
 
 int main(int argc, char *argv[]) {
-    double dtime;
+
+    int dim = getNbColsWhenRead(argv[1]);
+
+    // printf("dim = %d \n", dim);
 
     if (argc < 3) {
         printf("Error, arguments missing\n");
@@ -435,28 +452,25 @@ int main(int argc, char *argv[]) {
         MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_Status status;
-        int number_amount;
-
+        int predicted_size;
 
         if (rank == 0) {  // P0
-            printf("first arg : %s\nsecond arg : %s\n", argv[1], argv[2]);
+            // printf("first arg : %s\nsecond arg : %s\n", argv[1], argv[2]);
 
-            // calculate matrix length to know how much size to allocate
-            int matrix_length1 = calculateMatrixCarreLength(argv[1]);
-            // printf(" matrix length : %d \n" , matrix_length1);
-            int matrix_length2 = calculateMatrixCarreLength(argv[2]);
             // printf(" matrix length : %d \n" , matrix_length2);
 
             // allocate space for matrix A, matrix B and the correct size for matrix result
-            struct tablo *matrixA = allocateTablo(matrix_length1);
-            struct tablo *matrixB = allocateTablo(matrix_length2);
+            struct tablo *matrixA = allocateTablo(dim*dim);
+            struct tablo *matrixB = allocateTablo(dim*dim);
 
+            printf("A : size %d, rows %d, cols %d \n", matrixA->size, matrixA->nb_rows, matrixA->nb_cols);
+            printf("B : size %d, rows %d, cols %d \n", matrixB->size, matrixB->nb_rows, matrixB->nb_cols);
             // getting matrix data (of A and B) from file
             gettingMatrixDataFromFile(argv[1], matrixA);
             gettingMatrixDataFromFile(argv[2], matrixB);
 
-            prettyPrintMatrix(matrixA);
-            prettyPrintMatrix(matrixB);
+            // prettyPrintMatrix(matrixA);
+            // prettyPrintMatrix(matrixB);
 
             /*
 
@@ -529,8 +543,67 @@ int main(int argc, char *argv[]) {
 
 
 
-            
+            // step 1 : Send rows
+            for ( int i = 0 ; i < numprocs ; i ++ ) {
+                // printf("nb of process : %d \n", numprocs);
+                // printf("size submatrix divided by rows : %d \n", getSizeSubmatrixDividedByRows(matrixA, numprocs));
+                struct tablo *SubMatrixAByRows = allocateTablo(getSizeSubmatrixDividedByRows(matrixA, numprocs));
+                getSubmatrixDividedByRows(matrixA, SubMatrixAByRows, i, numprocs);
+                // printf("for proc : %d, here's the row slice: \n", i);
+                // prettyPrintMatrix(SubMatrixAByRows);
+                send_slice(SubMatrixAByRows->tab, SubMatrixAByRows->size, i);
+            }
+
+            // Receive A rows
+            struct tablo * my_rows = allocateTablo(getSizeSubmatrixDividedByRows(matrixA, numprocs));
+            getSubmatrixDividedByRows(matrixA, my_rows, 0, numprocs);
+            my_rows->nb_rows = dim / numprocs;
+            my_rows->nb_cols = dim;
+            printf("i'm the proc : %d, and here's my row slice: \n", rank);
+            prettyPrintMatrix(my_rows);
+
+            // step 2 : Send columns
+            for ( int i = 0 ; i < numprocs ; i ++ ) {
+                // printf("nb of process : %d \n", numprocs);
+                // printf("size submatrix divided by rows : %d \n", getSizeSubmatrixDividedByRows(matrixA, numprocs));
+                struct tablo *SubMatrixAByCols = allocateTablo(getSizeSubmatrixDividedByCols(matrixB, numprocs));
+                getSubmatrixDividedByCols(matrixB, SubMatrixAByCols, i, numprocs);
+                // printf("for proc : %d, here's the column slice: \n",i);
+                // prettyPrintMatrix(SubMatrixAByCols);
+                send_slice(SubMatrixAByCols->tab, SubMatrixAByCols->size, i);
+            }
+
+            // printf("///////////////////////////////////////////////\n");
+            // printf("proc rank : %d\n", rank);
+            // prettyPrintMatrix(my_rows);
+            // prettyPrintMatrix(my_cols)
+            // printf("///////////////////////////////////////////////\n");
+
         } else {  // others
+            MPI_Probe(0, 0, MPI_COMM_WORLD, &status);
+            MPI_Get_count(&status, MPI_INT, &predicted_size);
+
+            // Receive A rows
+            struct tablo * my_rows = allocateTablo(predicted_size);
+            my_rows->tab = recieve_slice(0, my_rows->size);
+            my_rows->nb_rows = dim / numprocs;
+            my_rows->nb_cols = dim;
+            printf("i'm the proc : %d, and here's my row slice: \n", rank);
+            prettyPrintMatrix(my_rows);
+
+            // Receive B columns
+            // struct tablo * my_cols = allocateTablo(predicted_size);
+            // my_cols->tab = recieve_slice(0, my_cols->size);
+            // my_cols->nb_rows = dim;
+            // my_cols->nb_cols = dim / numprocs;
+
+            // printf("///////////////////////////////////////////////\n");
+            // printf("proc rank : %d\n", rank);
+            // printf("my rows : \n");
+            // prettyPrintMatrix(my_rows);
+            // printf("my columns : \n");
+            // prettyPrintMatrix(my_cols);
+            // printf("///////////////////////////////////////////////\n");
 
         }
 
