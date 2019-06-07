@@ -592,10 +592,12 @@ int main(int argc, char *argv[]) {
             prettyPrintMatrix(my_rows);
 
             // Receive B columns
-            // struct tablo * my_cols = allocateTablo(predicted_size);
-            // my_cols->tab = recieve_slice(0, my_cols->size);
-            // my_cols->nb_rows = dim;
-            // my_cols->nb_cols = dim / numprocs;
+            struct tablo * my_cols = allocateTablo(predicted_size);
+            my_cols->tab = recieve_slice(0, my_cols->size);
+            my_cols->nb_rows = dim;
+            my_cols->nb_cols = dim / numprocs;
+            printf("i'm the proc : %d, and here's my col slice: \n", rank);
+            prettyPrintMatrix(my_cols);
 
             // printf("///////////////////////////////////////////////\n");
             // printf("proc rank : %d\n", rank);
