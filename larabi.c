@@ -2,42 +2,47 @@
 #include <stdlib.h>
 #include <math.h>
 #include <omp.h>
+#include <mpi.h>
+#include <assert.h>
 
 struct tablo {
-  int * tab;
-  int size;
-  int nb_cols;
-  int nb_rows;
+    int *tab;
+    int size;
+    int nb_cols;
+    int nb_rows;
 };
 
-struct tablo * allocateTablo(int size) {
-  struct tablo * tmp = malloc(sizeof(struct tablo));
-  tmp->size = size;
-  tmp->nb_cols = (int)sqrt(size);
-  tmp->nb_rows = (int)sqrt(size);
-  tmp->tab = malloc(size*sizeof(int));
-  return tmp;
+struct tablo *allocateTablo(int size) {
+    struct tablo *tmp = malloc(sizeof(struct tablo));
+    tmp->size = size;
+    tmp->nb_cols = (int) sqrt(size);
+    tmp->nb_rows = (int) sqrt(size);
+    tmp->tab = malloc(size * sizeof(int));
+    for (int i = 0; i < size; i++) {
+        tmp->tab[i] = 0;
+    }
+    return tmp;
 }
 
-struct tablo * reallocateTabloTwice(struct tablo * tmp) {
-  int oldsize = tmp->size;
-  tmp->size = oldsize * 2; 
-  tmp->tab = realloc(tmp->tab, tmp->size * sizeof(int));
+struct tablo *reallocateTabloTwice(struct tablo *tmp) {
+    int oldsize = tmp->size;
+    tmp->size = oldsize * 2;
+    tmp->tab = realloc(tmp->tab, tmp->size * sizeof(int));
 
-  for(int i = oldsize; i<tmp->size; i++){
-  	tmp->tab[i] = 0;
-  }
-  return tmp;
+    for (int i = oldsize; i < tmp->size; i++) {
+        tmp->tab[i] = 0;
+    }
+    return tmp;
 }
 
-void printArray(struct tablo * tmp) {
-  // printf("---- Array of size %i ---- \n", tmp->size);
-  int size = tmp->size;
-  int i;
-  for (i = 0; i < size; ++i) {
-    printf("%i ", tmp->tab[i]);
-  }
-  printf("\n");
+void printArray(struct tablo *tmp) {
+    // printf("---- Array of size %i ---- \n", tmp->size);
+    int size = tmp->size;
+    int i;
+    for (i = 0; i < size; ++i) {
+        printf("%i ", tmp->tab[i]);
+    }
+    printf("\n");
 }
 
 int getNbColsWhenRead(char filename[]) {
@@ -55,16 +60,14 @@ int getNbColsWhenRead(char filename[]) {
     // find length of first line
     // lines end in "\n", but some malformed text files may not have this char at all
     // and whole file contents will be considered as the first line
-    while((c = fgetc(fp)) != EOF) {
+    while ((c = fgetc(fp)) != EOF) {
         if (c == '\n') {
             break;
         }
-        if ((c != ' ') && (c != '-')){
+        if ((c != ' ') && (c != '-')) {
             nbCols++;
         }
     }
-
-    printf("nb cols is: %d\n", nbCols);
 
     // seek to beginning of file
     fseek(fp, 0, SEEK_SET);
@@ -89,7 +92,7 @@ int getNbRowsWhenRead(char filename[]) {
     // find length of first line
     // lines end in "\n", but some malformed text files may not have this char at all
     // and whole file contents will be considered as the first line
-    while((c = fgetc(fp)) != EOF) {
+    while ((c = fgetc(fp)) != EOF) {
         if (c == '\n') {
             nbRows++;
         }
@@ -105,8 +108,8 @@ int getNbRowsWhenRead(char filename[]) {
     return nbRows;
 }
 
-int calculateMatrixCarreLength(char filename[]){
-	int nbCols = getNbColsWhenRead(filename);
+int calculateMatrixCarreLength(char filename[]) {
+    int nbCols = getNbColsWhenRead(filename);
     return nbCols * nbCols;
 }
 
@@ -116,131 +119,134 @@ int calculateMatrixNotCarreLength(char filename[]) {
     return nbRow * nbCol;
 }
 
-void gettingMatrixDataFromFile(char filename[], struct tablo * matrix){
-	FILE *fp;
-	fp = fopen(filename, "r");
-	int i=0;
-	char c;
-	int isNeg = 0; // false if 0
-	int nbRows = 0;
-	while((c = fgetc(fp)) != EOF) {
-	    if (c == '-'){
-	        isNeg = 1;
-	    }
-	    if(c == '\n'){
-	        nbRows = nbRows + 1;
-	    }
-		if (c != '\n' && c != ' ' && c != '-') {
-			matrix->tab[i] = (int)(c - '0');
-			// printf("i : %d, c : %d\n", i, (int)(c - '0'));
-			if(isNeg == 1){
-                matrix->tab[i] = matrix->tab[i] * -1;
-                isNeg = 0;
-			}
-			i++;
-		}
-	}
-	matrix->nb_rows = nbRows;
-	matrix->nb_cols = i/nbRows;
+void gettingMatrixDataFromFile(char filename[], struct tablo *matrix) {
+    FILE *fp = fopen(filename, "r"); //read-only
+    int value = 0;
+    int count = 0;
+    if (!fp) {
+        fprintf(stderr, "Error while processing the file \n");
+        exit(EXIT_FAILURE);
+    }
+    //Going back to the start point
+    fseek(fp, 0, SEEK_SET);
+    // printf("%d lignes, %d colonnes \n", matrix->nb_rows , matrix->nb_cols);
+    if (!matrix->tab) {
+        fprintf(stderr, "Error while allocating for %d size \n", matrix->size);
+        exit(EXIT_FAILURE);
+    }
+    //Store values in tab
+    while (fscanf(fp, "%d", &value) && (!feof(fp))) {
+        matrix->tab[count] = value;
+        count++;
+    }
+    matrix->size = count;
 }
 
-int getElemFromMatrix(int i, int j, struct tablo * matrix){
-    if(i > matrix->nb_rows){
+int getElemFromMatrix(int i, int j, struct tablo *matrix) {
+    if (i > matrix->nb_rows) {
         printf("i is higher than the number of the matrix lines\n");
         exit(1);
-    }
-    else if(j > matrix->nb_cols){
+    } else if (j > matrix->nb_cols) {
         printf("j is higher than the number of the matrix columns\n");
         exit(1);
-    }
-    else if(j < 1){
+    } else if (j < 1) {
         printf("j is less than 1, it's not possible to get\n");
         exit(1);
-    }
-    else if(i < 1){
+    } else if (i < 1) {
         printf("i is less than 1, it's not possible to get\n");
         exit(1);
-    }
-    else{
-        return (matrix->tab[matrix->nb_cols * (i-1) + (j-1)]);
+    } else {
+        if (i == 1 && j == 1) {
+            return (matrix->tab[0]);
+        }
+        if (i == 1 && j != 1) {
+            return (matrix->tab[j - 1]);
+        } else {
+            return (matrix->tab[(i - 1) * matrix->nb_cols + j - 1]);
+        }
     }
 }
 
-int setElemToMatrix(int i, int j, struct tablo * matrix, int value){
-    if(i > matrix->nb_rows){
+void setElemToMatrix(int i, int j, struct tablo *matrix, int value) {
+    if (i > matrix->nb_rows) {
         printf("i is higher than the number of the matrix lines\n");
         exit(1);
-    }
-    else if(j > matrix->nb_cols){
+    } else if (j > matrix->nb_cols) {
         printf("j is higher than the number of the matrix columns\n");
         exit(1);
+    } else {
+        if (i == 1 && j == 1) {
+            matrix->tab[0] = value;
+        }
+        if (i == 1 && j != 1) {
+            matrix->tab[j - 1] = value;
+        } else {
+            matrix->tab[(i - 1) * matrix->nb_cols + j - 1] = value;
+        }
     }
-    else{
-        return (matrix->tab[matrix->nb_rows * (i-1) + (j-1)] = value);
-    }
+
+
 }
 
-int getMatrixSizeToAllocate(struct tablo * matrixA, struct tablo * matrixB){
+int getMatrixSizeToAllocate(struct tablo *matrixA, struct tablo *matrixB) {
     return matrixA->nb_rows * matrixB->nb_cols;
 }
 
-struct tablo * getCol(int j, struct tablo * matrixSrc, struct tablo * result){
-    for(int i = 0; i < matrixSrc->nb_rows; i++) {
+struct tablo *getCol(int j, struct tablo *matrixSrc, struct tablo *result) {
+    for (int i = 0; i < matrixSrc->nb_rows; i++) {
         // i + 1 parce qu'on peut pas get un élément 0. ça commence par 1
-        result->tab[i] = getElemFromMatrix(i+1, j, matrixSrc);
+        result->tab[i] = getElemFromMatrix(i + 1, j, matrixSrc);
     }
     return result;
 }
 
-struct tablo * getRow(int i, struct tablo * matrixSrc, struct tablo * result){
-    for(int j = 0; j < matrixSrc->nb_cols; j++) {
+struct tablo *getRow(int i, struct tablo *matrixSrc, struct tablo *result) {
+    for (int j = 0; j < matrixSrc->nb_cols; j++) {
         // i + 1 parce qu'on peut pas get un élément 0. ça commence par 1
-        result->tab[j] = getElemFromMatrix(i, j+1, matrixSrc);
+        result->tab[j] = getElemFromMatrix(i, j + 1, matrixSrc);
     }
     return result;
 }
 
-int sumMultipyTwoVectors(struct tablo * matrixRow, struct tablo * matrixCol){
+int sumMultipyTwoVectors(struct tablo *matrixRow, struct tablo *matrixCol) {
     int res = 0;
-    for(int i = 0; i < matrixRow->size; i++){
+    for (int i = 0; i < matrixRow->size; i++) {
         res = res + matrixRow->tab[i] * matrixCol->tab[i];
     }
     return res;
 }
 
 // depreciated
-void multiply1(struct tablo * matrixA, struct tablo * matrixB, struct tablo * matrixResult)
-{
-    if (matrixA->nb_cols != matrixB->nb_rows){
+void multiply1(struct tablo *matrixA, struct tablo *matrixB, struct tablo *matrixResult) {
+    if (matrixA->nb_cols != matrixB->nb_rows) {
         printf("nb de colonnes de la première matrice est different de nombre de ligne de deuxieme matrice");
         exit(1);
     }
 
     int i, j, k;
-    for (i = 0; i < matrixA->nb_rows; i++)
-    {
-        for (j = 0; j < matrixB->nb_cols; j++)
-        {
-            setElemToMatrix(i+1, j+1, matrixResult, 0);
+    for (i = 0; i < matrixA->nb_rows; i++) {
+        for (j = 0; j < matrixB->nb_cols; j++) {
+            setElemToMatrix(i + 1, j + 1, matrixResult, 0);
             for (k = 0; k < matrixA->nb_rows; k++)
-                setElemToMatrix(i+1, j+1, matrixResult, getElemFromMatrix(i+1, j+1, matrixResult) + getElemFromMatrix(i+1, k+1, matrixA) * getElemFromMatrix(k+1,j+1, matrixB));
+                setElemToMatrix(i + 1, j + 1, matrixResult, getElemFromMatrix(i + 1, j + 1, matrixResult) +
+                                                            getElemFromMatrix(i + 1, k + 1, matrixA) *
+                                                            getElemFromMatrix(k + 1, j + 1, matrixB));
         }
     }
 }
 
-void multiply2(struct tablo * matrixA, struct tablo * matrixB, struct tablo * matrixResult)
-{
-    if (matrixA->nb_cols != matrixB->nb_rows){
+void multiply2(struct tablo *matrixA, struct tablo *matrixB, struct tablo *matrixResult) {
+    if (matrixA->nb_cols != matrixB->nb_rows) {
         printf("nb de colonnes de la première matrice est different de nombre de ligne de deuxieme matrice");
         exit(1);
     }
-    for(int iA = 1; iA < matrixA->nb_rows+1; iA++){
+    for (int iA = 1; iA < matrixA->nb_rows + 1; iA++) {
 
-        for(int jB = 1; jB < matrixB->nb_cols+1; jB++){
+        for (int jB = 1; jB < matrixB->nb_cols + 1; jB++) {
 
             int sum = 0;
 
-            for(int iter = 1; iter < matrixA->nb_cols+1; iter++){
+            for (int iter = 1; iter < matrixA->nb_cols + 1; iter++) {
                 // printf("%d * %d\n",getElemFromMatrix(iA, iter, matrixA), getElemFromMatrix(iter, jB, matrixB));
                 sum = sum + getElemFromMatrix(iA, iter, matrixA), getElemFromMatrix(iter, jB, matrixB);
             }
@@ -250,63 +256,64 @@ void multiply2(struct tablo * matrixA, struct tablo * matrixB, struct tablo * ma
     }
 }
 
-void multiply3(struct tablo * matrixA, struct tablo * matrixB, struct tablo * matrixResult){
+void multiply3(struct tablo *matrixA, struct tablo *matrixB, struct tablo *matrixResult) {
 
-    struct tablo * matrixARow = allocateTablo(matrixA->nb_cols);
-    struct tablo * matrixBCol = allocateTablo(matrixB->nb_rows);
+    struct tablo *matrixARow = allocateTablo(matrixA->nb_cols);
+    struct tablo *matrixBCol = allocateTablo(matrixB->nb_rows);
     int value = 0;
-    for(int j = 0; j < matrixB->nb_cols; j++){
-        for(int i = 0; i < matrixA->nb_rows; i++){
+    for (int j = 0; j < matrixB->nb_cols; j++) {
+        for (int i = 0; i < matrixA->nb_rows; i++) {
 
-            getRow(i+1, matrixA, matrixARow);
-            getCol(j+1, matrixB, matrixBCol);
+            getRow(i + 1, matrixA, matrixARow);
+            getCol(j + 1, matrixB, matrixBCol);
 
             // ok
             value = sumMultipyTwoVectors(matrixARow, matrixBCol);
-            setElemToMatrix(i+1,j+1, matrixResult, value);
+            setElemToMatrix(i + 1, j + 1, matrixResult, value);
         }
     }
 }
 
-void multiply_omp(struct tablo * matrixA, struct tablo * matrixB, struct tablo * matrixResult)
-{
+void multiply_omp(struct tablo *matrixA, struct tablo *matrixB, struct tablo *matrixResult) {
     {
         int i, j, k;
-        for (i = 0; i < matrixA->nb_rows; i++)
-        {
-            for (j = 0; j < matrixB->nb_cols; j++)
-            {
-                setElemToMatrix(i+1, j+1, matrixResult, 0);
+        for (i = 0; i < matrixA->nb_rows; i++) {
+            for (j = 0; j < matrixB->nb_cols; j++) {
+                setElemToMatrix(i + 1, j + 1, matrixResult, 0);
                 for (k = 0; k < matrixA->nb_rows; k++)
-                    setElemToMatrix(i+1, j+1, matrixResult, getElemFromMatrix(i+1, j+1, matrixResult) + getElemFromMatrix(i+1, k+1, matrixA) * getElemFromMatrix(k+1,j+1, matrixB));
+                    setElemToMatrix(i + 1, j + 1, matrixResult, getElemFromMatrix(i + 1, j + 1, matrixResult) +
+                                                                getElemFromMatrix(i + 1, k + 1, matrixA) *
+                                                                getElemFromMatrix(k + 1, j + 1, matrixB));
             }
         }
     };
 
 }
 
-void getSubMatrix(struct tablo * matrix, struct tablo * submatrix, int startingrow, int endingrow, int startingcol, int endingcol){
-    printf("getting the submatrix of startrow : %d, endrow : %d, startcol : %d, endcol : %d \n", startingrow, endingrow, startingcol, endingcol);
-    if(endingrow < startingrow || endingrow > matrix->nb_rows){
+void getSubMatrix(struct tablo *matrix, struct tablo *submatrix, int startingrow, int endingrow, int startingcol,
+                  int endingcol) {
+    printf("getting the submatrix of startrow : %d, endrow : %d, startcol : %d, endcol : %d \n", startingrow, endingrow,
+           startingcol, endingcol);
+    if (endingrow < startingrow || endingrow > matrix->nb_rows) {
         printf("GetSubMatrix : error int the ending row input");
         exit(1);
     }
-    if(endingcol < startingcol || endingcol > matrix->nb_cols){
+    if (endingcol < startingcol || endingcol > matrix->nb_cols) {
         printf("GetSubMatrix : error in the ending col input");
         exit(1);
     }
-    if(startingrow < 1 || startingrow > matrix->nb_rows || startingrow > endingrow){
+    if (startingrow < 1 || startingrow > matrix->nb_rows || startingrow > endingrow) {
         printf("GetSubMatrix : error in the starting row input");
         exit(1);
     }
-    if(startingcol < 1 || startingcol > matrix->nb_cols || startingcol > endingcol){
+    if (startingcol < 1 || startingcol > matrix->nb_cols || startingcol > endingcol) {
         printf("GetSubMatrix : error in the starting col input");
         exit(1);
     }
 
     int k = 0;
-    for(int i = startingrow; i <= endingrow; i++){
-        for(int j = startingcol; j<= endingcol; j++){
+    for (int i = startingrow; i <= endingrow; i++) {
+        for (int j = startingcol; j <= endingcol; j++) {
             submatrix->tab[k] = getElemFromMatrix(i, j, matrix);
             k++;
         }
@@ -315,18 +322,18 @@ void getSubMatrix(struct tablo * matrix, struct tablo * submatrix, int startingr
     submatrix->nb_cols = endingcol - startingcol + 1;
 }
 
-int getSizeSubMatrix(struct tablo * matrix, int totalProcess){
+int getSizeSubMatrix(struct tablo *matrix, int totalProcess) {
     int nbrows = totalProcess / matrix->nb_rows;
-    if((totalProcess % matrix->nb_rows) != 0){
+    if ((totalProcess % matrix->nb_rows) != 0) {
         nbrows = nbrows + 1;
     }
     return nbrows * matrix->nb_cols;
 }
 
-void getRowsSubMatrix(struct tablo * matrix, struct tablo * submatrix, int nbOfProcess, int totalProcess){
+void getRowsSubMatrix(struct tablo *matrix, struct tablo *submatrix, int nbOfProcess, int totalProcess) {
     printf("getRowsSubMatrix:\n");
     int step = totalProcess / sqrt(submatrix->size);
-    if (step < 1){
+    if (step < 1) {
         step = 1;
     }
     int startingRow = step * nbOfProcess + 1;
@@ -336,10 +343,10 @@ void getRowsSubMatrix(struct tablo * matrix, struct tablo * submatrix, int nbOfP
     getSubMatrix(matrix, submatrix, startingRow, endingRow, startingCol, endingCol);
 }
 
-void getColsSubMatrix(struct tablo * matrix, struct tablo * submatrix, int nbOfProcess, int totalProcess){
+void getColsSubMatrix(struct tablo *matrix, struct tablo *submatrix, int nbOfProcess, int totalProcess) {
     printf("getColsSubMatrix:\n");
     int step = totalProcess / sqrt(submatrix->size);
-    if (step < 1){
+    if (step < 1) {
         step = 1;
     }
     int startingRow = 1;
@@ -349,142 +356,190 @@ void getColsSubMatrix(struct tablo * matrix, struct tablo * submatrix, int nbOfP
     getSubMatrix(matrix, submatrix, startingRow, endingRow, startingCol, endingCol);
 }
 
-int getSizeSubmatrixDividedByRows(struct tablo * matrix, int nbTotalProcess){
+int getSizeSubmatrixDividedByRows(struct tablo *matrix, int nbTotalProcess) {
     int nbRowsByProcess = matrix->nb_rows / nbTotalProcess;
     printf("nb rows by process : %d \n", nbRowsByProcess);
     return nbRowsByProcess * matrix->nb_cols;
 }
 
-int getSizeSubmatrixDividedByCols(struct tablo * matrix, int nbTotalProcess){
+int getSizeSubmatrixDividedByCols(struct tablo *matrix, int nbTotalProcess) {
     int nbColsByProcess = matrix->nb_cols / nbTotalProcess;
     printf("nb cols by process : %d \n", nbColsByProcess);
     return nbColsByProcess * matrix->nb_rows;
 }
 
-void getSubmatrixDividedByRows(struct tablo * matrix, struct tablo * subMatrix, int numberOfProcess, int nbTotalProcess){
-    printf("[getSubmatrixDividedByRows]\n");
+void getSubmatrixDividedByRows(struct tablo *matrix, struct tablo *subMatrix, int numberOfProcess, int nbTotalProcess) {
+    // printf("[getSubmatrixDividedByRows]\n");
     int nbRowsBySlice = matrix->nb_rows / nbTotalProcess;
-    int startingrow = nbRowsBySlice * numberOfProcess + 1 ;
+    int startingrow = nbRowsBySlice * numberOfProcess + 1;
     int endingrow = nbRowsBySlice * (numberOfProcess + 1);
     int startingcol = 1;
     int endingcol = matrix->nb_cols;
-    printf("nbRowsBySlice %d, startingrow %d, endingrow %d, startingcol %d, endingcol %d \n", nbRowsBySlice, startingrow, endingrow, startingcol, endingcol);
+    // printf("nbRowsBySlice %d, startingrow %d, endingrow %d, startingcol %d, endingcol %d \n", nbRowsBySlice, startingrow, endingrow, startingcol, endingcol);
     getSubMatrix(matrix, subMatrix, startingrow, endingrow, startingcol, endingcol);
 }
 
-struct tablo * getSubmatrixDividedByCols(struct tablo * matrix, struct tablo * subMatrix, int numberOfProcess, int nbTotalProcess){
+struct tablo * getSubmatrixDividedByCols(struct tablo *matrix, struct tablo *subMatrix, int numberOfProcess, int nbTotalProcess) {
     printf("[getSubmatrixDividedByRows]\n");
     int nbColsBySlice = matrix->nb_rows / nbTotalProcess;
     int startingrow = 1;
     int endingrow = matrix->nb_rows;
-    int startingcol = nbColsBySlice * numberOfProcess + 1 ;
+    int startingcol = nbColsBySlice * numberOfProcess + 1;
     int endingcol = nbColsBySlice * (numberOfProcess + 1);
     getSubMatrix(matrix, subMatrix, startingrow, endingrow, startingcol, endingcol);
     return subMatrix;
 }
 
-int main(int argc, char* argv[]) {
+void fillMatrix(struct tablo *bigMatrix, struct tablo *littleMatrix, int offset) {
+    if (bigMatrix->nb_rows != littleMatrix->nb_rows) {
+        printf("the two matrix do not have the same rows number \n");
+        exit(1);
+    } else {
+        for (int i = 1; i <= littleMatrix->nb_rows; i++) {
+            for (int j = 1; j <= littleMatrix->nb_cols; j++) {
+                int value = getElemFromMatrix(i, j, littleMatrix);
+                //printf("littlematrix(%d, %d) value : %d\n",i, j, value);
+                printf("bigmatrix(%d, %d) value : %d\n", i, j + offset, value);
 
+                setElemToMatrix(i, j + offset, bigMatrix, value);
+            }
+        }
+    }
+}
+
+void prettyPrintMatrix(struct tablo *Matrix) {
+    printf("------------------- \n");
+    for (int i = 1; i <= Matrix->nb_rows; i++) {
+        for (int j = 1; j <= Matrix->nb_cols; j++) {
+            printf(" %d", getElemFromMatrix(i, j, Matrix));
+            // printf("(%d,%d) : %d\n", i, j, getElemFromMatrix(i, j, Matrix));
+        }
+        printf("\n");
+    }
+    printArray(Matrix);
+    printf("Matrix length : %d. Nb Cols : %d. Nb Rows : %d \n", Matrix->size, Matrix->nb_cols, Matrix->nb_rows);
+    printf("------------------- \n");
+}
+
+int main(int argc, char *argv[]) {
     double dtime;
-	if (argc < 3) {
-		printf("Error, arguments missing\n");	
-		return EXIT_FAILURE;
-	} else {
-		printf("first arg : %s\nsecond arg : %s\n", argv[1], argv[2]);
 
-		// calculate matrix length to know how much size to allocate
-		int matrix_length1 = calculateMatrixNotCarreLength(argv[1]);
-        int matrix_length2 = calculateMatrixNotCarreLength(argv[2]);
+    if (argc < 3) {
+        printf("Error, arguments missing\n");
+        return EXIT_FAILURE;
+    } else {
 
-
-        // allocate space for matrix A, matrix B and the correct size for matrix result
-		struct tablo * matrixA = allocateTablo(matrix_length1);
-		struct tablo * matrixB = allocateTablo(matrix_length2);
-
-		// getting matrix data (of A and B) from file
-		gettingMatrixDataFromFile(argv[1], matrixA);
-		gettingMatrixDataFromFile(argv[2], matrixB);
-
-        printf("size to allocate for result matrix %d\n", getMatrixSizeToAllocate(matrixA, matrixB));
-        struct tablo * matrixResult = allocateTablo(getMatrixSizeToAllocate(matrixA, matrixB));
-        printf("Matrix result size: %d\n", matrixResult->size);
-
-        printf("for matrix A, it has %d rows and %d cols \n", matrixA->nb_rows, matrixA->nb_cols);
-        printArray(matrixA);
-
-        printf("for matrix B, it has %d rows and %d cols \n", matrixB->nb_rows, matrixB->nb_cols);
-        printArray(matrixB);
-
-        //printf("for matrix B, elem (2, 1) is %d \n", getElemFromMatrix(2,1,matrixB));
-
-        printf("size submatrix divided by rows : %d \n", getSizeSubmatrixDividedByRows(matrixA, 3));
-        printf("size submatrix divided by cols : %d \n", getSizeSubmatrixDividedByCols(matrixB, 3));
-
-        struct tablo * SubMatrixAByRows = allocateTablo(getSizeSubmatrixDividedByRows(matrixA, 3));
-        struct tablo * SubMatrixAByCols = allocateTablo(getSizeSubmatrixDividedByCols(matrixA, 3));
-
-        getSubmatrixDividedByRows(matrixA, SubMatrixAByRows, 0, 3);
-        getSubmatrixDividedByCols(matrixA, SubMatrixAByCols, 0, 3);
-
-        printArray(SubMatrixAByRows);
-        printArray(SubMatrixAByCols);
-
-        
-        /*
-        // multiply 2 seems to be the best one.
-        printf("testing multiply 2 without openmp\n");
-        dtime = omp_get_wtime();
-        multiply2(matrixA, matrixB, matrixResult);
-        dtime = omp_get_wtime() - dtime;
-        printf("%f\n", dtime);
-        printArray(matrixResult);
-
-        printf("testing multiply 3 without openmp\n");
-        dtime = omp_get_wtime();
-        multiply3(matrixA, matrixB, matrixResult);
-        dtime = omp_get_wtime() - dtime;
-        printf("%f\n", dtime);
-        printArray(matrixResult);
+        // MPI attributs
+        int rank, numprocs;
+        MPI_Init(&argc, &argv);
+        MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        MPI_Status status;
+        int number_amount;
 
 
-        // done : repair matrix length when reading : ok
-        // done : correcting the multiply function for unbalanced matrix
+        if (rank == 0) {  // P0
+            printf("first arg : %s\nsecond arg : %s\n", argv[1], argv[2]);
+
+            // calculate matrix length to know how much size to allocate
+            int matrix_length1 = calculateMatrixCarreLength(argv[1]);
+            // printf(" matrix length : %d \n" , matrix_length1);
+            int matrix_length2 = calculateMatrixCarreLength(argv[2]);
+            // printf(" matrix length : %d \n" , matrix_length2);
+
+            // allocate space for matrix A, matrix B and the correct size for matrix result
+            struct tablo *matrixA = allocateTablo(matrix_length1);
+            struct tablo *matrixB = allocateTablo(matrix_length2);
+
+            // getting matrix data (of A and B) from file
+            gettingMatrixDataFromFile(argv[1], matrixA);
+            gettingMatrixDataFromFile(argv[2], matrixB);
+
+            prettyPrintMatrix(matrixA);
+            prettyPrintMatrix(matrixB);
+
+            /*
+
+            printf("TESTING MULTIPLY MATRICES CARRES \n");
+
+            printf("size to allocate for result matrix  : %d\n", getMatrixSizeToAllocate(matrixA, matrixB));
+            struct tablo *matrixResult = allocateTablo(getMatrixSizeToAllocate(matrixA, matrixB));
+            printf("Matrix result size: %d\n", matrixResult->size);
+            multiply3(matrixA, matrixB, matrixResult);
+            prettyPrintMatrix(matrixResult);
+
+            int matrix_length3 = 6;
+            int matrix_length4 = 6;
+
+            struct tablo *matrix3 = allocateTablo(matrix_length3);
+            struct tablo *matrix4 = allocateTablo(matrix_length4);
+            */
 
 
-        // testing submatrix (of 4 elements)
-        struct tablo * subMatrix = allocateTablo(4);
-        getSubMatrix(matrixA, subMatrix, 1, 2, 2, 3);
-        printArray(subMatrix);
-        printf("nb cols : %d\n", subMatrix->nb_cols);
-        printf("nb rows : %d\n", subMatrix->nb_rows);
+            /*
+            printf("TESTING MULTIPLY MATRICES NON CARRES : ok \n");
+
+            matrix3->tab = (int[6]){1,-2,3,4,5,6};
+            matrix3->nb_rows = 2;
+            matrix3->nb_cols = 3;
+
+            matrix4->tab = (int[6]){1,-2,4,5,7,8};
+            matrix4->nb_rows = 3;
+            matrix4->nb_cols = 2;
+
+            prettyPrintMatrix(matrix3);
+            prettyPrintMatrix(matrix4);
+
+            printf("size to allocate for result matrix  : %d\n", getMatrixSizeToAllocate(matrix3, matrix4));
+            struct tablo *matrixResult2 = allocateTablo(getMatrixSizeToAllocate(matrix3, matrix4));
+            printf("Matrix result size: %d\n", matrixResult2->size);
+            multiply3(matrix3, matrix4, matrixResult2);
+            prettyPrintMatrix(matrixResult2);
+            */
+
+            /*
+            printf("TESTING GETTING SUBMATRIX DEVIDED BY ROW/COL : ok \n");
+
+            printf("size submatrix divided by rows : %d \n", getSizeSubmatrixDividedByRows(matrixA, 3));
+            printf("size submatrix divided by cols : %d \n", getSizeSubmatrixDividedByCols(matrixB, 3));
+
+            struct tablo *SubMatrixAByRows = allocateTablo(getSizeSubmatrixDividedByRows(matrixA, 3));
+            struct tablo *SubMatrixAByCols = allocateTablo(getSizeSubmatrixDividedByCols(matrixA, 3));
+
+            getSubmatrixDividedByRows(matrixA, SubMatrixAByRows, 0, 3);
+            getSubmatrixDividedByCols(matrixA, SubMatrixAByCols, 0, 3);
+
+            prettyPrintMatrix(SubMatrixAByRows);
+            prettyPrintMatrix(SubMatrixAByCols);
+
+            */
+
+            /*
+            printf("TESTING FILLING SLICE OF BIG MATRIX BY SMALL MATRIX : ok \n");
+            struct tablo * bigMatrix = allocateTablo(18);
+            bigMatrix->nb_cols = 6;
+            bigMatrix->nb_rows = 3;
+            printf("for bigMatrix, it has %d rows and %d cols \n", bigMatrix->nb_rows, bigMatrix->nb_cols);
+            printf("for matrix A, it has %d rows and %d cols \n", matrixA->nb_rows, matrixA->nb_cols);
+            fillMatrix(bigMatrix, matrixA, 3);
+            printf("---------\n");
+            prettyPrintMatrix(bigMatrix);
+            printf("for bigMatrix, it has %d rows and %d cols \n", bigMatrix->nb_rows, bigMatrix->nb_cols);
+            */
 
 
-        struct tablo * matrixACol = allocateTablo(sqrt(matrix_length));
-        struct tablo * matrixARow = allocateTablo(sqrt(matrix_length));
 
-        int sizesubmatrix = getSizeSubMatrix(matrixA, 3);
+            
+        } else {  // others
 
+        }
 
+        MPI_Finalize();
 
-        struct tablo * subMatrixA = allocateTablo(sizesubmatrix);
-        struct tablo * subMatrixAA = allocateTablo(sizesubmatrix);
-        struct tablo * multiplysubmatrix = allocateTablo(1);
-        getRowsSubMatrix(matrixA, subMatrixA, 0, 1);
-        getColsSubMatrix(matrixA, subMatrixAA, 0, 1);
-        printArray(subMatrixA);
-        printArray(subMatrixAA);
-        multiply(subMatrixA, subMatrixAA , multiplysubmatrix);
-        printArray(multiplysubmatrix);*/
+    }
 
+    return EXIT_SUCCESS;
 
-
-	}
-
-	// scatter pour A, scatter pour B
-	// matrice vecteur donc il faut un autre for
-
-	return EXIT_SUCCESS;
-	
 }
 
 
