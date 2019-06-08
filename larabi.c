@@ -18,7 +18,7 @@ struct tablo *allocateTablo(int size) {
     tmp->nb_cols = (int) sqrt(size);
     tmp->nb_rows = (int) sqrt(size);
     tmp->tab = malloc(size * sizeof(int));
-
+#pragma omp parallel for
     for (int i = 0; i < size; i++) {
         tmp->tab[i] = 0;
     }
@@ -406,6 +406,7 @@ void fillMatrix(struct tablo *bigMatrix, struct tablo *littleMatrix, int offset)
         printf("the two matrix do not have the same rows number \n");
         exit(1);
     } else {
+#pragma omp parallel for
         for (int i = 1; i <= littleMatrix->nb_rows; i++) {
             for (int j = 1; j <= littleMatrix->nb_cols; j++) {
                 int value = getElemFromMatrix(i, j, littleMatrix);
@@ -422,6 +423,7 @@ void fillFinalMatrix(struct tablo *finalMatrix, struct tablo *bigMatrix, int off
         printf("the two matrix do not have the same cols number \n");
         exit(1);
     } else {
+#pragma omp parallel for
         for (int i = 1; i <= bigMatrix->nb_rows; i++) {
             for (int j = 1; j <= bigMatrix->nb_cols; j++) {
                 int value = getElemFromMatrix(i, j, bigMatrix);
