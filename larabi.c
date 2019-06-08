@@ -685,7 +685,10 @@ int main(int argc, char *argv[]) {
                 fillFinalMatrix(finalMatrix, recievedMatrix, i * dim/numprocs);
                 // prettyPrintMatrix(finalMatrix);
             }
-            prettyPrintMatrix(finalMatrix);
+            // prettyPrintMatrix(finalMatrix);
+            printArray(finalMatrix);
+
+
         } else {  // others
             MPI_Probe(0, 0, MPI_COMM_WORLD, &status);
             MPI_Get_count(&status, MPI_INT, &predicted_size);
