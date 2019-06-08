@@ -19,7 +19,6 @@ struct tablo *allocateTablo(int size) {
     tmp->nb_rows = (int) sqrt(size);
     tmp->tab = malloc(size * sizeof(int));
 
-    #pragma omp parallel for
     for (int i = 0; i < size; i++) {
         tmp->tab[i] = 0;
     }
@@ -251,7 +250,6 @@ void multiply3(struct tablo *matrixA, struct tablo *matrixB, struct tablo *matri
     struct tablo *matrixARow = allocateTablo(matrixA->nb_cols);
     struct tablo *matrixBCol = allocateTablo(matrixB->nb_rows);
     int value = 0;
-    #pragma omp parallel for
     for (int j = 0; j < matrixB->nb_cols; j++) {
         for (int i = 0; i < matrixA->nb_rows; i++) {
 
@@ -263,6 +261,7 @@ void multiply3(struct tablo *matrixA, struct tablo *matrixB, struct tablo *matri
             setElemToMatrix(i + 1, j + 1, matrixResult, value);
         }
     }
+
     free(matrixARow);
     free(matrixBCol);
 }
@@ -306,7 +305,6 @@ void getSubMatrix(struct tablo *matrix, struct tablo *submatrix, int startingrow
     }
 
     int k = 0;
-
     for (int i = startingrow; i <= endingrow; i++) {
         for (int j = startingcol; j <= endingcol; j++) {
             submatrix->tab[k] = getElemFromMatrix(i, j, matrix);
@@ -408,8 +406,6 @@ void fillMatrix(struct tablo *bigMatrix, struct tablo *littleMatrix, int offset)
         printf("the two matrix do not have the same rows number \n");
         exit(1);
     } else {
-
-        #pragma omp parallel for
         for (int i = 1; i <= littleMatrix->nb_rows; i++) {
             for (int j = 1; j <= littleMatrix->nb_cols; j++) {
                 int value = getElemFromMatrix(i, j, littleMatrix);
@@ -426,8 +422,6 @@ void fillFinalMatrix(struct tablo *finalMatrix, struct tablo *bigMatrix, int off
         printf("the two matrix do not have the same cols number \n");
         exit(1);
     } else {
-
-        #pragma omp parallel for
         for (int i = 1; i <= bigMatrix->nb_rows; i++) {
             for (int j = 1; j <= bigMatrix->nb_cols; j++) {
                 int value = getElemFromMatrix(i, j, bigMatrix);
@@ -461,7 +455,6 @@ void rotateMatrixToTheRight(struct tablo *matrix, int k){
     // within the size of matrix
     k = k % matrix->nb_cols;
 
-    #pragma omp parallel for
     for (int i = 0; i < matrix->nb_rows; i++) {
 
         // copy first M-k elements to temporary array
@@ -481,6 +474,7 @@ void rotateMatrixToTheRight(struct tablo *matrix, int k){
 int main(int argc, char *argv[]) {
 
     int dim = getNbColsWhenRead(argv[1]);
+
 
     if (argc < 3) {
         printf("Error, arguments missing\n");
@@ -541,7 +535,6 @@ int main(int argc, char *argv[]) {
 
             // printf("[ PROC %d ] sending rows to every processor\n", rank);
             // step 1 : Send rows
-
             for ( int i = 1; i < numprocs ; i ++ ) {
                 struct tablo *SubMatrixAByRows = allocateTablo(getSizeSubmatrixDividedByRows(matrixA, numprocs));
                 getSubmatrixDividedByRows(matrixA, SubMatrixAByRows, i, numprocs);
@@ -573,23 +566,26 @@ int main(int argc, char *argv[]) {
                 fillMatrix(bigMatrix, my_product, ((rank+step)%numprocs * dim/numprocs) % dim);
                 step++;
                 rotateMatrixToTheRight(matrixB, (dim/numprocs * numprocs) - dim/numprocs);
-
                 free(my_cols);
+
             }
 
             free(my_rows);
+
 
             fillFinalMatrix(finalMatrix, bigMatrix, rank * (dim / numprocs));
 
             //  recieve bigmatrix
             for ( int i = 1 ; i < numprocs ; i++ ) {
-                struct tablo * recievedMatrix = allocateTablo(dim/numprocs * dim);
+                struct tablo *recievedMatrix = allocateTablo(dim/numprocs * dim);
                 recievedMatrix->tab = recieve_slice(i, recievedMatrix->size);
                 recievedMatrix->nb_rows = dim / numprocs;
                 recievedMatrix->nb_cols = dim;
                 fillFinalMatrix(finalMatrix, recievedMatrix, i * dim/numprocs);
             }
+
             prettyPrintMatrix(finalMatrix);
+
             free(finalMatrix);
             free(matrixA);
             free(matrixB);

@@ -18,6 +18,7 @@ struct tablo *allocateTablo(int size) {
     tmp->nb_cols = (int) sqrt(size);
     tmp->nb_rows = (int) sqrt(size);
     tmp->tab = malloc(size * sizeof(int));
+    #pragma omp parallel for
     for (int i = 0; i < size; i++) {
         tmp->tab[i] = 0;
     }
@@ -127,6 +128,7 @@ void gettingMatrixDataFromFile(char filename[], struct tablo *matrix) {
     matrix->size = count;
     matrix->nb_rows = sqrt(matrix->size);
     matrix->nb_cols = sqrt(matrix->size);
+    fclose(fp);
 }
 
 int getElemFromMatrix(int i, int j, struct tablo *matrix) {
@@ -259,6 +261,9 @@ void multiply3(struct tablo *matrixA, struct tablo *matrixB, struct tablo *matri
             setElemToMatrix(i + 1, j + 1, matrixResult, value);
         }
     }
+
+    free(matrixARow);
+    free(matrixBCol);
 }
 
 // depreciated
@@ -401,6 +406,7 @@ void fillMatrix(struct tablo *bigMatrix, struct tablo *littleMatrix, int offset)
         printf("the two matrix do not have the same rows number \n");
         exit(1);
     } else {
+        #pragma omp parallel for
         for (int i = 1; i <= littleMatrix->nb_rows; i++) {
             for (int j = 1; j <= littleMatrix->nb_cols; j++) {
                 int value = getElemFromMatrix(i, j, littleMatrix);
@@ -417,6 +423,7 @@ void fillFinalMatrix(struct tablo *finalMatrix, struct tablo *bigMatrix, int off
         printf("the two matrix do not have the same cols number \n");
         exit(1);
     } else {
+        #pragma omp parallel for
         for (int i = 1; i <= bigMatrix->nb_rows; i++) {
             for (int j = 1; j <= bigMatrix->nb_cols; j++) {
                 int value = getElemFromMatrix(i, j, bigMatrix);
@@ -536,6 +543,7 @@ int main(int argc, char *argv[]) {
                 send_slice(SubMatrixAByRows->tab, SubMatrixAByRows->size, i);
                 // printf("[ PROC %d ] \t sending the following row slice to the processor %d ... \n", rank, i);
                 // prettyPrintMatrix(SubMatrixAByRows);
+                free(SubMatrixAByRows);
             }
 
             for(int rotation = 0; rotation < numprocs; rotation++){
@@ -545,6 +553,7 @@ int main(int argc, char *argv[]) {
                     struct tablo *SubMatrixAByCols = allocateTablo(getSizeSubmatrixDividedByCols(matrixB, numprocs));
                     getSubmatrixDividedByCols(matrixB, SubMatrixAByCols, i, numprocs);
                     send_slice(SubMatrixAByCols->tab, SubMatrixAByCols->size, i);
+                    free(SubMatrixAByCols);
                 }
 
                 // get B columns for P0
@@ -559,7 +568,11 @@ int main(int argc, char *argv[]) {
                 fillMatrix(bigMatrix, my_product, ((rank+step)%numprocs * dim/numprocs) % dim);
                 step++;
                 rotateMatrixToTheRight(matrixB, (dim/numprocs * numprocs) - dim/numprocs);
+                free(my_cols);
+
             }
+
+            free(my_rows);
 
 
             fillFinalMatrix(finalMatrix, bigMatrix, rank * (dim / numprocs));
@@ -574,6 +587,11 @@ int main(int argc, char *argv[]) {
             }
 
             prettyPrintMatrix(finalMatrix);
+
+            free(finalMatrix);
+            free(matrixA);
+            free(matrixB);
+            free(my_rows);
 
         } else { // others processors
             MPI_Probe(0, 0, MPI_COMM_WORLD, &status);
@@ -597,9 +615,14 @@ int main(int argc, char *argv[]) {
                 multiply3(my_rows, my_cols, my_product);
                 fillMatrix(bigMatrix, my_product, ((rank+step)%numprocs * dim/numprocs) % dim);
                 step++;
+                free(my_product);
+                free(my_cols);
             }
+            free(my_rows);
             send_slice(bigMatrix->tab, bigMatrix->size, 0);
         }
+        free(littleMatrix);
+        free(bigMatrix);
         MPI_Finalize();
     }
     return EXIT_SUCCESS;

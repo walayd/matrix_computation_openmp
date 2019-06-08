@@ -134,7 +134,9 @@ Choix de conception
 ------------
 Parallèlisme
 ------------
-    On utilise OpenMPI pour paralleliser..
+    On utilise omp pour paralleliser..
+        - les allocations (à 0)
+        - le remplissage des matrices (fillmatrix et fillfinalmatrix)
 
 
 
