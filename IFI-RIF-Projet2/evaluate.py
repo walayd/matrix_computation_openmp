@@ -26,7 +26,7 @@ def runDataset(name, i) :
         binFile=binFolder+name
         if not isfile(binFile) :
             return "Error"
-        output = subprocess.check_output(["mpirun", "-np", "4", binFolder+name, dataFolder+"a_"+str(i), dataFolder+"b_"+str(i)], stderr=STDOUT, timeout=5,universal_newlines=True).strip().replace('\n', '').replace(' ', '')
+        output = subprocess.check_output(["mpirun", "--oversubscribe", "-np", "4", binFolder+name, dataFolder+"a_"+str(i), dataFolder+"b_"+str(i)], stderr=STDOUT, timeout=5,universal_newlines=True).strip().replace('\n', '').replace(' ', '')
         # print(output)
         return check_output(dataFolder+"/result_"+str(i), output)
 

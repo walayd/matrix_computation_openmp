@@ -1,2 +1,163 @@
-# matrix_computation_openmp
-The goal of this project is to compute C=A.B where A et B are 2 square matrices of size NxN. The computation will be distributed on P processus (machines) organized as a virtual ring using MPI and local computation will be parallelized using OpenMP.
+---------------------------------------------------------------------------
+Projet réalisé par Walid LARABI - SI4 - Programmation Parallèle - 2018 2019
+---------------------------------------------------------------------------
+    (English) The goal of this project is to compute C=A.B where A et B are 2 square matrices of size NxN.
+    The computation will be distributed on P processus (machines) organized as a virtual ring
+    using MPI and local computation will be parallelized using OpenMP.
+
+-------------------
+Lignes de commandes
+-------------------
+
+    ---------------------------------------------------------------------------------------------------------------------------------
+    Script automatique pour tester rapidement la solution
+    -----------------------------------------------------
+    Le script test la multiplication de deux matrices (A * B qui se trouve sur data et data2 (resp.)).
+    La multiplication utilise 4 coeurs.
+
+    ## run the script :
+        > ./build_run.sh
+
+
+    ---------------------------------------------------------------------------------------------------------------------------------
+    Configuration manuelle de l'input
+    ---------------------------------
+    Pour lancer le projet en lignes de commandes configurable. Voici les étapes :
+
+    ## build solution:
+        > mpicc -Wall -lm -fopenmp -o out  larabi.c
+
+    ## run with some dummy data:
+        > mpirun --oversubscribe -np [NUMBER_OF_PROCESS_TO_USE] ./out  [MATRIX_A_DATAFILE] [MATRIX_B_DATAFILE]
+
+        example :
+        > mpirun --oversubscribe -np 4 ./out  ./dummy/data3 ./dummy/data4
+
+    ## clear solution:
+        > rm ./out
+
+    --------------------------------------------------------------------------------------------------------------------------------
+
+----------------------
+Etapes de l'algorithme
+----------------------
+
+    p0 commence à travailler
+        seulement p0 a accès à la matrice A et la matrice B
+        Les autres n'ont pas accès aux matrices A et B
+
+    pour la suite, on suppose qu'on a 3 processeurs :
+
+    * 1ere étape de l'algo:
+        p0 lis A
+        p0 distrbue A
+            comment il distribue?
+                division : il découpe A en autant de morceaux qu'il y a de processeurs
+                si A il a plusieurs lignes (9 lignes) chaque processeur aura une sous matrice de 3 lignes (A0 pour P0 , A1 pour P1, A2 pour P2..)
+                dont lui même (il récupère son morceau directement)
+
+    * 2eme étape de l'algo:
+        p0 lis B
+        p0 distribue B
+            comment il distribue?
+                division : il découpe B en autant de morceaux qu'il y a de processeurs
+                si B il a plusieurs colonnes (9 colonnes) chaque processeur aura une sous matrice de 3 colonnes (B0 pour P0 , B1 pour P1, B2 pour P2..)
+
+    info : l'opération de distrubution, est ce qu'on appele "scatter".
+    Scatter est l'opération de distribuer une grosse donnée à plein de monde en petit morceaux (algo vu en cours)
+
+    On calcule le produit matriciel
+
+    P0 : A0 * B0
+    P1 : A1 * B1
+    P2 : A2 * B2
+
+    à la fin de ces premières étapes, chaque processeur aura un bout de matrice carré qu'il devra stocker dans
+    une matrice de résultat partiel. Cette matrice de résultat partiel fait le même nombre de lignes que
+    la matrice du produit, et le même nombre de colonnes * nombre de processeurs à disposition.
+    pour stocker, on utilise la méthode fillbigmatrix, qui prend la matrice produit et la met sur la matrice du résultat partiel
+    en fonction d'un offset calculé.
+
+
+    le résultat reste incomplet.
+
+    l'étape d'après, on fait circuler B. (algo orienté, on doit définir le bon sens, dans mon cas, à droite)
+
+    B0, B1, B2 --> B2, B0, B1
+
+    On calcule le produit matriciel
+
+    P0 : A0 * B2
+    P1 : A1 * B0
+    P2 : A2 * B1
+
+    On stock le produit dans le bon endroit
+
+    Une dernière fois, on fait circuler B
+
+    et on calcule les bons morceaux
+
+    P0 : A0 * B1
+    P1 : A1 * B2
+    P2 : A2 * B0
+
+    à la fin de ces étapes de calculs (calcul local + circulation : étape longue et compliquée.)
+
+    Chaque processeur à une ligne complète (ou bloc de ligne complète) qui est le résultat partiel de la matrice finale
+
+    Il faut ramener tout le monde à p0 (gather)
+
+    et enfin, p0 reçoit les matrices résultats partiels, il remplit sa matrice résultat et l'affiche avec le bon format.
+
+
+-------------------
+Choix de conception
+-------------------
+
+
+    Choix : un tableau d'une dimension pour représenter la matrice :
+
+        avantages :
+            - cache prefetch du processeur... le parcours va vite
+        problem :
+            - difficulté pour trouver un bloc memoire continue (sur des fichiers de plusieurs giga)
+            - faire des calculs d'offsets (solution: nous avons implementer des methodes get et set..)
+
+
+    En terme de code:
+        avantages:
+            - code modulable, découpé en fonctions avec petite responsabilité
+        inconvénient:
+            - tout est fait sur un seul fichier..
+
+
+------------
+Parallèlisme
+------------
+    On utilise OpenMPI pour paralleliser..
+
+
+
+------------
+Consignes :
+------------
+
+    - Le programme calcule des matrices de taille N * N, avec P processeurs.
+        N doit être divisible par P
+        P doit être inférieur ou égale à N.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
