@@ -278,7 +278,7 @@ void multiply_omp(struct tablo *matrixA, struct tablo *matrixB, struct tablo *ma
 void getSubMatrix(struct tablo *matrix, struct tablo *submatrix, int startingrow, int endingrow, int startingcol,
                   int endingcol) {
     // printf("getting the submatrix of startrow : %d, endrow : %d, startcol : %d, endcol : %d \n", startingrow, endingrow,
-           // startingcol, endingcol);
+    // startingcol, endingcol);
     if (endingrow < startingrow || endingrow > matrix->nb_rows) {
         printf("GetSubMatrix : error int the ending row input");
         exit(1);
