@@ -127,6 +127,7 @@ void gettingMatrixDataFromFile(char filename[], struct tablo *matrix) {
     matrix->size = count;
     matrix->nb_rows = sqrt(matrix->size);
     matrix->nb_cols = sqrt(matrix->size);
+    fclose(fp);
 }
 
 int getElemFromMatrix(int i, int j, struct tablo *matrix) {
@@ -259,6 +260,8 @@ void multiply3(struct tablo *matrixA, struct tablo *matrixB, struct tablo *matri
             setElemToMatrix(i + 1, j + 1, matrixResult, value);
         }
     }
+    free(matrixARow);
+    free(matrixBCol);
 }
 
 // depreciated
@@ -536,6 +539,7 @@ int main(int argc, char *argv[]) {
                 send_slice(SubMatrixAByRows->tab, SubMatrixAByRows->size, i);
                 // printf("[ PROC %d ] \t sending the following row slice to the processor %d ... \n", rank, i);
                 // prettyPrintMatrix(SubMatrixAByRows);
+                free(SubMatrixAByRows);
             }
 
             for(int rotation = 0; rotation < numprocs; rotation++){
@@ -545,6 +549,7 @@ int main(int argc, char *argv[]) {
                     struct tablo *SubMatrixAByCols = allocateTablo(getSizeSubmatrixDividedByCols(matrixB, numprocs));
                     getSubmatrixDividedByCols(matrixB, SubMatrixAByCols, i, numprocs);
                     send_slice(SubMatrixAByCols->tab, SubMatrixAByCols->size, i);
+                    free(SubMatrixAByCols);
                 }
 
                 // get B columns for P0
@@ -559,21 +564,27 @@ int main(int argc, char *argv[]) {
                 fillMatrix(bigMatrix, my_product, ((rank+step)%numprocs * dim/numprocs) % dim);
                 step++;
                 rotateMatrixToTheRight(matrixB, (dim/numprocs * numprocs) - dim/numprocs);
+
+                free(my_cols);
             }
 
+            free(my_rows);
 
             fillFinalMatrix(finalMatrix, bigMatrix, rank * (dim / numprocs));
 
             //  recieve bigmatrix
             for ( int i = 1 ; i < numprocs ; i++ ) {
-                struct tablo *recievedMatrix = allocateTablo(dim/numprocs * dim);
+                struct tablo * recievedMatrix = allocateTablo(dim/numprocs * dim);
                 recievedMatrix->tab = recieve_slice(i, recievedMatrix->size);
                 recievedMatrix->nb_rows = dim / numprocs;
                 recievedMatrix->nb_cols = dim;
                 fillFinalMatrix(finalMatrix, recievedMatrix, i * dim/numprocs);
             }
-
             prettyPrintMatrix(finalMatrix);
+            free(finalMatrix);
+            free(matrixA);
+            free(matrixB);
+            free(my_rows);
 
         } else { // others processors
             MPI_Probe(0, 0, MPI_COMM_WORLD, &status);
@@ -597,9 +608,14 @@ int main(int argc, char *argv[]) {
                 multiply3(my_rows, my_cols, my_product);
                 fillMatrix(bigMatrix, my_product, ((rank+step)%numprocs * dim/numprocs) % dim);
                 step++;
+                free(my_product);
+                free(my_cols);
             }
+            free(my_rows);
             send_slice(bigMatrix->tab, bigMatrix->size, 0);
         }
+        free(littleMatrix);
+        free(bigMatrix);
         MPI_Finalize();
     }
     return EXIT_SUCCESS;
